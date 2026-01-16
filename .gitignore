@@ -1,0 +1,21 @@
+
+# CREDENTIALS
+main/config/credentials.h
+
+
+# vscode
+.vscode/
+
+# Build output
+build/
+
+# Python
+.venv/
+
+# Others
+sdkconfig*
+
+# Data logs
+soil_data_logs/
+
+
