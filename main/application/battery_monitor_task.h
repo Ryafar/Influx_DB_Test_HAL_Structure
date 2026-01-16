@@ -3,8 +3,8 @@
 
 #include "esp_err.h"
 
-#include "../drivers/adc/adc_manager.h"
-#include "../drivers/led/led.h"
+#include "adc_manager.h"
+#include "led.h"
 #include "../config/esp32-config.h"
 
 esp_err_t battery_monitor_init();

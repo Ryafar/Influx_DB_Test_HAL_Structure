@@ -4,7 +4,7 @@
  */
 
 #include "http_buffer.h"
-#include "../../utils/esp_utils.h"
+#include "esp_utils.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <string.h>

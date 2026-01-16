@@ -13,8 +13,8 @@
 #include "esp_err.h"
 #include "driver/gpio.h"
 
-#include "utils/esp_utils.h"
-#include "../adc/adc_manager.h"
+#include "esp_utils.h"
+#include "adc_manager.h"
 
 /**
  * Parameters

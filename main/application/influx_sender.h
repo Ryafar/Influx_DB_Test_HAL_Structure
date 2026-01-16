@@ -5,7 +5,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
-#include "../drivers/influxdb/influxdb_client.h"
+#include "influxdb_client.h"
 
 #ifdef __cplusplus
 extern "C" {

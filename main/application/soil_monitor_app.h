@@ -10,9 +10,9 @@
 #define SOIL_MONITOR_APP_H
 
 #include "esp_err.h"
-#include "../drivers/csm_v2_driver/csm_v2_driver.h"
-#include "../drivers/wifi/wifi_manager.h"
-#include "../drivers/http/http_client.h"
+#include "csm_v2_driver.h"
+#include "wifi_manager.h"
+#include "http_client.h"
 
 /**
  * @brief Application configuration

@@ -6,12 +6,12 @@
 #include "string.h"
 
 #include "../config/esp32-config.h"
-#include "../utils/esp_utils.h"
-#include "../utils/ntp_time.h"
-#include "../drivers/wifi/wifi_manager.h"
-#include "../drivers/influxdb/influxdb_client.h"
+#include "esp_utils.h"
+#include "ntp_time.h"
+#include "wifi_manager.h"
+#include "influxdb_client.h"
 #include "influx_sender.h"
-#include "../drivers/sensors/aht20.h"
+#include "aht20.h"
 
 static const char* TAG = "ENV_MONITOR_APP";
 

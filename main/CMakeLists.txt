@@ -5,15 +5,8 @@
 idf_component_register(SRCS "soil_project_main.c"
                             "application/influx_sender.c"
                             "application/env_monitor_app.c"
-                            "drivers/wifi/wifi_manager.c"
-                            "drivers/http/http_client.c"
-                            "drivers/http/http_buffer.c"
-                            "drivers/influxdb/influxdb_client.c"
-                            "drivers/sensors/aht20.c"
-                            "utils/esp_utils.c"
-                            "utils/ntp_time.c"
                        INCLUDE_DIRS "."
-                       REQUIRES driver esp_wifi esp_netif nvs_flash esp_event esp_http_client esp-tls json esp_timer lwip)
+                       REQUIRES drivers utils nvs_flash esp_event esp_timer)
 
 
 #######################

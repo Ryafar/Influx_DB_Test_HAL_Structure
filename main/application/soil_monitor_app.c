@@ -5,9 +5,9 @@
 
 #include "soil_monitor_app.h"
 #include "../config/esp32-config.h"
-#include "../utils/esp_utils.h"
-#include "../utils/ntp_time.h"
-#include "../drivers/influxdb/influxdb_client.h"
+#include "esp_utils.h"
+#include "ntp_time.h"
+#include "influxdb_client.h"
 #include "influx_sender.h"
 #include "esp_log.h"
 #include "esp_mac.h"

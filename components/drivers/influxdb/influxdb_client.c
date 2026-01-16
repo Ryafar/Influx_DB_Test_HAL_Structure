@@ -1,6 +1,6 @@
 
 #include "influxdb_client.h"
-#include "../../config/esp32-config.h"
+#include "config/esp32-config.h"
 #if INFLUXDB_USE_HTTPS
 #include <esp_crt_bundle.h>
 #endif

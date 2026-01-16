@@ -9,8 +9,8 @@
 #ifndef HTTP_CLIENT_H
 #define HTTP_CLIENT_H
 
-#include "../../utils/esp_utils.h"
-#include "../../config/esp32-config.h"
+#include "esp_utils.h"
+#include "config/esp32-config.h"
 
 #include "esp_err.h"
 #include "esp_http_client.h"

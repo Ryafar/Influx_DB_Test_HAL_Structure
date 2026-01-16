@@ -1,6 +1,6 @@
 #include "wifi_connection_main.h"
 #include "esp_log.h"
-#include "utils/ntp_time.h"  // Add NTP module
+#include "ntp_time.h"  // Add NTP module
 
 
 

@@ -3,7 +3,7 @@
  * @brief WiFi Connection Manager Implementation
  */
 
-#include "../../config/esp32-config.h"
+#include "config/esp32-config.h"
 #include "wifi_manager.h"
 
 #include <string.h>

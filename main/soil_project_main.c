@@ -11,7 +11,7 @@
 #include "esp_sleep.h"
 #include "application/influx_sender.h"
 #include "application/env_monitor_app.h"
-#include "utils/ntp_time.h"
+#include "ntp_time.h"
 
 static const char *TAG = "MAIN";
 
