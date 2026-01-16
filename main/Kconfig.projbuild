@@ -1,0 +1,24 @@
+menu "Environment Monitor Configuration"
+
+config ENV_SLEEP_SECONDS
+    int "Deep sleep duration (seconds)"
+    range 1 86400
+    default 10
+    help
+        Duration in seconds to sleep between AHT20 measurement cycles.
+        Set to a small value (e.g. 10) for rapid testing, higher for production.
+
+config ENV_MEASUREMENTS_PER_CYCLE
+    int "Measurements per wake cycle"
+    range 1 1000
+    default 1
+    help
+        Number of AHT20 readings taken before entering deep sleep.
+
+config ENV_ENABLE_LOGGING
+    bool "Enable environment sensor logging"
+    default y
+    help
+        Enable ESP_LOGI output for each measurement.
+
+endmenu
