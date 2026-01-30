@@ -1,12 +1,13 @@
 /**
- * @file soil_project_main.c
- * @brief Main application entry point for Soil Moisture Sensor project
+ * @file main.c
+ * @brief Main application entry point
  * 
- * This file demonstrates the usage of the modular soil moisture sensor driver
- * and application layer with deep sleep power management.
+ * Entry point for the ESP32 application. Initializes the selected monitoring
+ * application (environment/soil/battery), handles deep sleep power management,
+ * and coordinates the overall system lifecycle.
  */
 
-#include "soil_project_main.h"
+#include "main.h"
 #include "esp_log.h"
 #include "esp_sleep.h"
 #include "application/influx_sender.h"

@@ -1,3 +1,12 @@
+/**
+ * @file battery_monitor_task.h
+ * @brief Battery Voltage Monitoring Task
+ * 
+ * This module provides battery voltage monitoring functionality using ADC.
+ * Includes automatic calibration, NVS-based configuration storage, and
+ * InfluxDB data logging capabilities.
+ */
+
 #ifndef BATTERY_MONITOR_TASK_H
 #define BATTERY_MONITOR_TASK_H
 

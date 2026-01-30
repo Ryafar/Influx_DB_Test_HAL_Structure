@@ -1,3 +1,12 @@
+/**
+ * @file battery_monitor_task.c
+ * @brief Battery Voltage Monitoring Task - Implementation
+ * 
+ * Monitors battery voltage using ADC with reference counting for resource
+ * management. Supports automatic calibration triggered by triple-reset,
+ * stores calibration data in NVS, and sends measurements to InfluxDB.
+ */
+
 #include "battery_monitor_task.h"
 #include "../config/esp32-config.h"
 #include "esp_utils.h"

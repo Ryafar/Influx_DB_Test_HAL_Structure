@@ -1,3 +1,12 @@
+/**
+ * @file influx_sender.h
+ * @brief InfluxDB Data Sender Service
+ * 
+ * Provides a queue-based service task for asynchronously sending sensor data
+ * to InfluxDB. Decouples measurement tasks from HTTP transmission to prevent
+ * stack overflow and improve system responsiveness.
+ */
+
 #ifndef INFLUX_SENDER_H
 #define INFLUX_SENDER_H
 

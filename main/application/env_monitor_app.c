@@ -1,3 +1,12 @@
+/**
+ * @file env_monitor_app.c
+ * @brief Environment Monitoring Application - Implementation
+ * 
+ * Implements a FreeRTOS task-based application for continuous environmental
+ * monitoring using the AHT20 sensor. Integrates with WiFi, NTP time sync,
+ * and InfluxDB for remote data logging.
+ */
+
 #include "env_monitor_app.h"
 #include "esp_log.h"
 #include "esp_mac.h"

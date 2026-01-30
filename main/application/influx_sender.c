@@ -1,3 +1,12 @@
+/**
+ * @file influx_sender.c
+ * @brief InfluxDB Data Sender Service - Implementation
+ * 
+ * Implements a dedicated FreeRTOS task with message queue for handling
+ * InfluxDB write operations. Supports soil, battery, and environmental
+ * sensor data transmission with proper error handling and logging.
+ */
+
 #include "influx_sender.h"
 #include "esp_log.h"
 #include "string.h"

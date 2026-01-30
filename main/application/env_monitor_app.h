@@ -1,3 +1,12 @@
+/**
+ * @file env_monitor_app.h
+ * @brief Environment Monitoring Application (AHT20 Temperature/Humidity Sensor)
+ * 
+ * This module provides a complete application layer for monitoring environmental
+ * conditions using the AHT20 sensor. Handles sensor initialization, periodic
+ * measurements, WiFi connectivity, and InfluxDB data transmission.
+ */
+
 #ifndef ENV_MONITOR_APP_H
 #define ENV_MONITOR_APP_H
 

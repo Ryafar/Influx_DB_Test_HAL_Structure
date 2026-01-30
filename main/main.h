@@ -1,10 +1,10 @@
 /**
- * @file soil_project_main.h
- * @brief Main application header for Soil Moisture Sensor project
+ * @file main.h
+ * @brief Main application header
  */
 
-#ifndef SOIL_PROJECT_MAIN_H
-#define SOIL_PROJECT_MAIN_H
+#ifndef MAIN_H
+#define MAIN_H
 
 #include <stdio.h>
 #include "esp_system.h"
