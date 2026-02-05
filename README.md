@@ -27,17 +27,21 @@ A power-efficient ESP32-C6 application that monitors temperature and humidity us
 ```
 ├── main/
 │   ├── main.c                          # Entry point, lifecycle management
+│   ├── Kconfig.projbuild               # Optional menuconfig (ENV settings only)
 │   ├── config/
-│   │   ├── esp32-config.h              # Hardware pins, intervals, feature flags
+│   │   ├── esp32-config.h              # All hardware/feature config (feature toggles!)
 │   │   └── credentials.h               # WiFi & InfluxDB credentials (git-ignored)
 │   └── application/
-│       ├── env_monitor_app.c/h         # Environment monitoring task
-│       ├── influx_sender.c/h           # Async InfluxDB sender with queue
-│       └── [legacy apps...]            # Soil/battery monitoring (disabled)
+│       ├── env_monitor_app.c/h         # Environment monitoring task (AHT20)
+│       ├── battery_monitor_task.c/h    # Battery voltage monitoring (toggle in config)
+│       ├── soil_monitor_app.c/h        # Soil moisture monitoring (toggle in config)
+│       └── influx_sender.c/h           # Async InfluxDB sender with queue
 │
 ├── components/
 │   ├── drivers/
 │   │   ├── sensors/aht20/              # AHT20 I2C driver
+│   │   ├── csm_v2_driver/              # Capacitive soil moisture sensor driver
+│   │   ├── adc/                        # Shared ADC manager (multi-channel support)
 │   │   ├── wifi/wifi_manager/          # WiFi connection management
 │   │   ├── http/http_client/           # HTTP client wrapper
 │   │   └── influxdb/influxdb_client/   # InfluxDB Line Protocol formatter
@@ -45,10 +49,15 @@ A power-efficient ESP32-C6 application that monitors temperature and humidity us
 │       ├── esp_utils.c/h               # Timestamp & MAC address helpers
 │       └── ntp_time.c/h                # NTP time synchronization
 │
-├── sdkconfig.defaults                  # Custom ESP-IDF configuration
-├── CMakeLists.txt                      # Build configuration
+├── sdkconfig.defaults                  # Default ESP-IDF configuration
+├── CMakeLists.txt                      # Root build configuration
 └── README.md                           # This file
 ```
+
+**Simple Configuration:**
+- Edit `main/config/esp32-config.h` to enable/disable features and configure hardware
+- All sources are always compiled, `#if ENABLE_*` decides what runs
+- Optional: Use `idf.py menuconfig` for ENV sleep/measurement settings
 
 ## Setup Instructions
 
@@ -112,36 +121,115 @@ Replace `COM3` with your actual serial port.
 
 ## Configuration
 
-### Main Settings (`main/config/esp32-config.h`)
+### Simple Header-Based Configuration
 
-**I2C Configuration:**
+All project settings are in **one place**: `main/config/esp32-config.h`
+
+#### Enable/Disable Features
+
+At the top of `esp32-config.h`, toggle features on/off:
+
+```c
+// ============================================================================
+// Feature Toggles - Enable/Disable Monitoring Modules
+// ============================================================================
+
+#define ENABLE_ENV_MONITOR      1    // AHT20 temperature/humidity sensor
+#define ENABLE_BATTERY_MONITOR  0    // Battery voltage monitoring via ADC
+#define ENABLE_SOIL_MONITOR     0    // Soil moisture monitoring via ADC
+```
+
+**That's it!** Set to `1` to enable, `0` to disable. No menuconfig needed.
+
+#### Configure Hardware Settings
+
+Each enabled feature has its own configuration block in the same file:
+
+**Battery Monitor (when `ENABLE_BATTERY_MONITOR = 1`):**
+```c
+#define BATTERY_ADC_UNIT                        ADC_UNIT_1
+#define BATTERY_ADC_CHANNEL                     ADC_CHANNEL_0      // GPIO0 on ESP32-C6
+#define BATTERY_MONITOR_VOLTAGE_SCALE_FACTOR    2.0f              // Voltage divider
+#define BATTERY_MONITOR_LOW_VOLTAGE_THRESHOLD   3.2f              // Low battery alert
+```
+
+**Soil Monitor (when `ENABLE_SOIL_MONITOR = 1`):**
+```c
+#define SOIL_ADC_UNIT               ADC_UNIT_1
+#define SOIL_ADC_CHANNEL            ADC_CHANNEL_0
+#define SOIL_SENSOR_POWER_PIN       GPIO_NUM_19    // GPIO to power sensor
+#define SOIL_DRY_VOLTAGE_DEFAULT    3.0f
+#define SOIL_WET_VOLTAGE_DEFAULT    1.0f
+```
+
+**Environment Monitor (always on):**
 ```c
 #define I2C_SDA_PIN              GPIO_NUM_7
 #define I2C_SCL_PIN              GPIO_NUM_9
 #define I2C_FREQ_HZ              100000
 ```
 
+**WiFi & InfluxDB:**
+```c
+#define USE_INFLUXDB            1
+#define INFLUXDB_SERVER         "sensors.example.org"
+#define INFLUXDB_PORT           443
+#define WIFI_MAX_RETRY          15
+```
+
 **Deep Sleep:**
 ```c
-#define DEEP_SLEEP_ENABLED              1      // Enable deep sleep
-#define DEEP_SLEEP_DURATION_SECONDS     10     // Sleep duration
+#define DEEP_SLEEP_ENABLED              1
+#define DEEP_SLEEP_DURATION_SECONDS     10      // Sleep between cycles
 ```
 
-**Measurements:**
-```c
-#define ENV_MEASUREMENT_INTERVAL_MS     10000  // Interval between measurements
-#define CONFIG_ENV_MEASUREMENTS_PER_CYCLE 1    // Measurements per wake cycle
+### Optional: Menuconfig for ENV Settings
+
+For environment monitoring, you can optionally use `idf.py menuconfig`:
+
+```bash
+idf.py menuconfig
+# → Environment Monitor Configuration
+# → Adjust sleep duration, measurements per cycle, logging
 ```
 
-**NTP Time Sync:**
-```c
-#define NTP_ENABLED                     0      // 0 = use server time, 1 = use NTP
-```
+These settings override the defaults in code:
+- `CONFIG_ENV_SLEEP_SECONDS` (default: 10)
+- `CONFIG_ENV_MEASUREMENTS_PER_CYCLE` (default: 1)
+- `CONFIG_ENV_ENABLE_LOGGING` (default: yes)
 
-### Kconfig Options
+**But you don't have to use menuconfig** – the defaults work fine.
 
-Use `idf.py menuconfig` or edit `sdkconfig.defaults`:
-- Partition table: `CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y` (for large builds)
+### Configuration Workflow
+
+**To enable Battery Monitor:**
+
+1. Edit `main/config/esp32-config.h`:
+   ```c
+   #define ENABLE_BATTERY_MONITOR  1    // Changed from 0 to 1
+   ```
+
+2. Configure ADC channel (if needed):
+   ```c
+   #define BATTERY_ADC_CHANNEL     ADC_CHANNEL_0  // GPIO0
+   ```
+
+3. Build and flash:
+   ```bash
+   idf.py build flash monitor
+   ```
+
+That's it! No menuconfig, no separate files, just edit one header and rebuild.
+
+### Quick Reference
+
+| Setting | File | Type |
+|---------|------|------|
+| **Enable Features** | `esp32-config.h` | `#define ENABLE_* 0/1` |
+| **Hardware Pins** | `esp32-config.h` | `#define *_GPIO_PIN` |
+| **ADC Config** | `esp32-config.h` | `#define *_ADC_*` |
+| **WiFi/InfluxDB** | `credentials.h` | Server URLs, tokens |
+| **Sleep Duration** | `esp32-config.h` or menuconfig | Deep sleep seconds |
 
 ## How It Works
 

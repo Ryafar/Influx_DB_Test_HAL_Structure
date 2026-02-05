@@ -5,11 +5,10 @@
 idf_component_register(SRCS "main.c"
                             "application/influx_sender.c"
                             "application/env_monitor_app.c"
+                            "application/battery_monitor_task.c"
+                            "application/soil_monitor_app.c"
                        INCLUDE_DIRS "."
                        REQUIRES drivers utils nvs_flash esp_event esp_timer)
-
-
-#######################
 #   TESTING           #
 #######################
 

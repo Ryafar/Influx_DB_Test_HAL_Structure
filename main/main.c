@@ -16,7 +16,12 @@
 
 #include "config/esp32-config.h"
 #include "application/influx_sender.h"
+#if ENABLE_ENV_MONITOR
 #include "application/env_monitor_app.h"
+#endif
+#if ENABLE_BATTERY_MONITOR
+#include "application/battery_monitor_task.h"
+#endif
 #include "ntp_time.h"
 
 static const char *TAG = "MAIN";
@@ -31,10 +36,9 @@ static const char *TAG = "MAIN";
  */
 static void enter_deep_sleep(uint32_t duration_seconds) {
     if (!DEEP_SLEEP_ENABLED) {
-        ESP_LOGI(TAG, "Deep sleep disabled, restarting in 5 seconds...");
-        vTaskDelay(pdMS_TO_TICKS(5000));
-        esp_restart();
-        return;
+        ESP_LOGI(TAG, "Deep sleep disabled, waiting %lu seconds before next cycle...", duration_seconds);
+        vTaskDelay(pdMS_TO_TICKS(duration_seconds * 1000));
+        return;  // Return to loop
     }
     
     uint64_t sleep_time_us = (uint64_t)duration_seconds * 1000000ULL;
@@ -58,15 +62,12 @@ static void handle_init_failure(void) {
 
 /**
  * @brief Cleanup resources and enter normal sleep cycle
- * @param app Pointer to environment monitor app
  */
-static void cleanup_and_sleep(env_monitor_app_t* app) {
+static void cleanup_and_sleep(void) {
     ESP_LOGI(TAG, "Preparing for deep sleep...");
     
-    // Clean up resources before deep sleep
     // Stop sender first to avoid races with HTTP/TLS deinit
     influx_sender_deinit();
-    env_monitor_deinit(app);
     
     enter_deep_sleep(DEEP_SLEEP_DURATION_SECONDS);
 }
@@ -134,19 +135,39 @@ static void init_ntp_sync(void) {
 
 /**
  * @brief Initialize the monitoring application
- * @param app Pointer to environment monitor app
- * @param config Pointer to configuration structure
  * @return ESP_OK on success, error code otherwise
  */
-static esp_err_t init_application(env_monitor_app_t* app, env_monitor_config_t* config) {
-    env_monitor_get_default_config(config);
+static esp_err_t init_application(void) {
+    esp_err_t ret = ESP_OK;
     
-    ESP_LOGI(TAG, "Initializing environment monitoring application...");
-    esp_err_t ret = env_monitor_init(app, config);
+#if ENABLE_ENV_MONITOR
+    static env_monitor_app_t env_app;
+    env_monitor_config_t env_config;
+    env_monitor_get_default_config(&env_config);
+    
+    ESP_LOGI(TAG, "Initializing environment monitor (AHT20)...");
+    ret = env_monitor_init(&env_app, &env_config);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize env application: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "ENV monitor init failed: %s", esp_err_to_name(ret));
         return ret;
     }
+#endif
+
+#if ENABLE_BATTERY_MONITOR
+    ESP_LOGI(TAG, "Initializing battery monitor (GPIO0/ADC)...");
+    ret = battery_monitor_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Battery monitor init failed: %s", esp_err_to_name(ret));
+#if ENABLE_ENV_MONITOR
+        env_monitor_deinit(&env_app);
+#endif
+        return ret;
+    }
+#endif
+
+#if !ENABLE_ENV_MONITOR && !ENABLE_BATTERY_MONITOR && !ENABLE_SOIL_MONITOR
+    #error "At least one monitor must be enabled!"
+#endif
     
 #if NTP_ENABLED
     init_ntp_sync();
@@ -158,27 +179,49 @@ static esp_err_t init_application(env_monitor_app_t* app, env_monitor_config_t* 
 }
 
 /**
- * @brief Run the monitoring cycle (measurements and data transmission)
- * @param app Pointer to environment monitor app
- * @param config Pointer to configuration
+ * @brief Run the monitoring cycle for all enabled monitors
  * @return ESP_OK on success, error code otherwise
  */
-static esp_err_t run_monitoring_cycle(env_monitor_app_t* app, const env_monitor_config_t* config) {
-    // Start environment monitoring task
-    ESP_LOGI(TAG, "Starting environment monitoring (%lu measurement(s))...", config->measurements_per_cycle);
-    esp_err_t ret = env_monitor_start(app);
+static esp_err_t run_monitoring_cycle(void) {
+    esp_err_t ret = ESP_OK;
+    
+#if ENABLE_ENV_MONITOR
+    static env_monitor_app_t env_app;
+    ESP_LOGI(TAG, "Starting environment monitoring...");
+    ret = env_monitor_start(&env_app);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to start env monitoring: %s", esp_err_to_name(ret));
-        env_monitor_deinit(app);
+        ESP_LOGE(TAG, "ENV monitor start failed: %s", esp_err_to_name(ret));
         return ret;
     }
-    
-    // Wait for measurements to complete
-    ESP_LOGI(TAG, "Waiting for all measurements to complete...");
-    ret = env_monitor_wait_for_completion(app, config->measurements_per_cycle * config->measurement_interval_ms + 30000);
+#endif
+
+#if ENABLE_BATTERY_MONITOR
+    ESP_LOGI(TAG, "Starting battery monitoring...");
+    ret = battery_monitor_start(BATTERY_MEASUREMENTS_PER_CYCLE);
     if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Env monitoring completion failed: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Battery monitor start failed: %s", esp_err_to_name(ret));
+        return ret;
     }
+#endif
+
+    // Wait for all monitors to complete
+    ESP_LOGI(TAG, "Waiting for measurements to complete...");
+    
+#if ENABLE_ENV_MONITOR
+    ret = env_monitor_wait_for_completion(&env_app, 30000);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "ENV monitor timeout: %s", esp_err_to_name(ret));
+    }
+    env_monitor_deinit(&env_app);
+#endif
+
+#if ENABLE_BATTERY_MONITOR
+    ret = battery_monitor_wait_for_completion(30000);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Battery monitor timeout: %s", esp_err_to_name(ret));
+    }
+    battery_monitor_deinit();
+#endif
     
     // Wait for all InfluxDB data to be sent
     ESP_LOGI(TAG, "Waiting for all data to be sent to InfluxDB...");
@@ -187,7 +230,7 @@ static esp_err_t run_monitoring_cycle(env_monitor_app_t* app, const env_monitor_
         ESP_LOGW(TAG, "InfluxDB sender queue not empty: %s", esp_err_to_name(ret));
     }
     
-    ESP_LOGI(TAG, "All measurements complete and data sent!");
+    ESP_LOGI(TAG, "All measurements complete!");
     return ESP_OK;
 }
 
@@ -196,25 +239,40 @@ static esp_err_t run_monitoring_cycle(env_monitor_app_t* app, const env_monitor_
 // ============================================================================
 
 void app_main(void) {
-    ESP_LOGI(TAG, "=== Environment (AHT20) Sensor with Deep Sleep ===");
+    ESP_LOGI(TAG, "=== ESP32 Sensor Node with Deep Sleep ===");
+#if ENABLE_ENV_MONITOR
+    ESP_LOGI(TAG, "  - ENV Monitor: ENABLED");
+#endif
+#if ENABLE_BATTERY_MONITOR
+    ESP_LOGI(TAG, "  - Battery Monitor: ENABLED");
+#endif
+#if ENABLE_SOIL_MONITOR
+    ESP_LOGI(TAG, "  - Soil Monitor: ENABLED");
+#endif
     ESP_LOGI(TAG, "ESP-IDF Version: %s", esp_get_idf_version());
     
     log_wakeup_reason();
     
-    // Initialize application
-    static env_monitor_app_t app;
-    env_monitor_config_t config;
-    
-    if (init_application(&app, &config) != ESP_OK) {
+    // Initialize enabled monitors (only once)
+    if (init_application() != ESP_OK) {
         handle_init_failure();
         return;
     }
     
-    // Run monitoring cycle
-    if (run_monitoring_cycle(&app, &config) != ESP_OK) {
-        ESP_LOGW(TAG, "Monitoring cycle had warnings");
+    // Main measurement loop
+    while (1) {
+        // Run monitoring cycle
+        if (run_monitoring_cycle() != ESP_OK) {
+            ESP_LOGW(TAG, "Monitoring cycle had warnings");
+        }
+        
+        // Sleep or delay before next cycle
+        cleanup_and_sleep();
+        
+        // If deep sleep is enabled, we never reach here (device resets)
+        // If disabled, loop continues after delay
+        if (DEEP_SLEEP_ENABLED) {
+            break;  // Should never reach, but safety exit
+        }
     }
-    
-    // Cleanup and enter sleep
-    cleanup_and_sleep(&app);
 }

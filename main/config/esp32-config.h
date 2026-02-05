@@ -1,57 +1,86 @@
 /**
  * @file esp32-config.h
- * @brief ESP32 Hardware Configuration for Soil Moisture Sensor Project
+ * @brief ESP32 Hardware Configuration for Multi-Sensor Project
  * 
  * This file contains all hardware-specific configurations including
- * pin assignments, ADC settings, and project constants.
+ * pin assignments, ADC settings, feature toggles, and project constants.
  */
 
 #ifndef ESP32_CONFIG_H
 #define ESP32_CONFIG_H
 
-#define LEGACY_SOIL_BATTERY_SUPPORT 0
 #include "credentials.h"
+#include "driver/gpio.h"
+#include "esp_adc/adc_oneshot.h"
 
+// ============================================================================
+// Feature Toggles - Enable/Disable Monitoring Modules
+// ============================================================================
+
+#define ENABLE_ENV_MONITOR      0    // AHT20 temperature/humidity sensor
+#define ENABLE_BATTERY_MONITOR  1    // Battery voltage monitoring via ADC
+#define ENABLE_SOIL_MONITOR     0    // Soil moisture monitoring via ADC
+
+// ============================================================================
+// Deep Sleep Configuration
+// ============================================================================
+
+#define DEEP_SLEEP_ENABLED              1                   // Enable/disable deep sleep mode (0 = restart after measurements)
+#define DEEP_SLEEP_DURATION_SECONDS     10                  // Sleep duration between measurement cycles
+#define DEEP_SLEEP_WAKEUP_DELAY_MS      100                 // Delay before entering deep sleep
+
+// ============================================================================
 // GPIO Pin Assignments
+// ============================================================================
+
 #define LED_GPIO_NUM           GPIO_NUM_22
 
-#if LEGACY_SOIL_BATTERY_SUPPORT
 // ============================================================================
-// Legacy Soil & Battery (disabled in env-only build)
+// Battery Monitor Configuration (if enabled)
 // ============================================================================
-#define SOIL_ADC_UNIT           ADC_UNIT_1
-#define SOIL_ADC_CHANNEL        ADC_CHANNEL_0
-#define SOIL_ADC_BITWIDTH       ADC_BITWIDTH_12
-#define SOIL_ADC_ATTENUATION    ADC_ATTEN_DB_11
-#define SOIL_ADC_VREF           3.3f
 
-#define BATTERY_ADC_UNIT        ADC_UNIT_1
-#define BATTERY_ADC_CHANNEL     ADC_CHANNEL_3
-#define BATTERY_ADC_BITWIDTH    ADC_BITWIDTH_12
-#define BATTERY_ADC_ATTENUATION ADC_ATTEN_DB_11
-#define BATTERY_ADC_VREF        3.3f
+#if ENABLE_BATTERY_MONITOR
+
+#define BATTERY_ADC_UNIT                        ADC_UNIT_1
+#define BATTERY_ADC_CHANNEL                     ADC_CHANNEL_0      // GPIO0
+#define BATTERY_ADC_BITWIDTH                    ADC_BITWIDTH_12
+#define BATTERY_ADC_ATTENUATION                 ADC_ATTEN_DB_11
+#define BATTERY_ADC_VREF                        3.3f
+
+#define BATTERY_MONITOR_VOLTAGE_SCALE_FACTOR    1.0f    // Direct 1:1 connection (no voltage divider)
+#define BATTERY_MONITOR_LOW_VOLTAGE_THRESHOLD   3.2f    // Low battery threshold in volts
+#define BATTERY_MONITOR_USE_DEEP_SLEEP_ON_LOW_BATTERY  1
+
+#define BATTERY_MONITOR_TASK_STACK_SIZE         (4 * 1024)
+#define BATTERY_MONITOR_TASK_PRIORITY           5
+#define BATTERY_MONITOR_TASK_NAME               "battery_monitor"
+#define BATTERY_MONITOR_MEASUREMENT_INTERVAL_MS (10 * 1000)
+#define BATTERY_MEASUREMENTS_PER_CYCLE          1
+
+#endif // ENABLE_BATTERY_MONITOR
+
+// ============================================================================
+// Soil Monitor Configuration
+// ============================================================================
+
+#define SOIL_ADC_UNIT               ADC_UNIT_1
+#define SOIL_ADC_CHANNEL            ADC_CHANNEL_0
+#define SOIL_ADC_BITWIDTH           ADC_BITWIDTH_12
+#define SOIL_ADC_ATTENUATION        ADC_ATTEN_DB_11
+#define SOIL_ADC_VREF               3.3f
+
+#define SOIL_SENSOR_POWER_PIN       GPIO_NUM_19
 
 #define SOIL_TASK_STACK_SIZE            (4 * 1024)
 #define SOIL_TASK_PRIORITY              5
 #define SOIL_TASK_NAME                  "soil_monitor"
-#define SOIL_SENSOR_POWER_PIN           GPIO_NUM_19
 #define SOIL_AUTO_CALIBRATION_ENABLE    0
 #define SOIL_CALIBRATION_TIMEOUT_MS     10000
 #define SOIL_CALIBRATION_SAMPLES        10
 #define SOIL_DRY_VOLTAGE_DEFAULT        3.0f
 #define SOIL_WET_VOLTAGE_DEFAULT        1.0f
-#define SOIL_MEASUREMENT_INTERVAL_MS    10 * 1000
+#define SOIL_MEASUREMENT_INTERVAL_MS    (10 * 1000)
 #define SOIL_MEASUREMENTS_PER_CYCLE     1
-
-#define BATTERY_MONITOR_TASK_STACK_SIZE    (4 * 1024)
-#define BATTERY_MONITOR_TASK_PRIORITY      5
-#define BATTERY_MONITOR_TASK_NAME          "battery_monitor"
-#define BATTERY_MONITOR_MEASUREMENT_INTERVAL_MS    10 * 1000
-#define BATTERY_MONITOR_LOW_VOLTAGE_THRESHOLD      3.2f
-#define BATTERY_MONITOR_VOLTAGE_SCALE_FACTOR      2.0f
-#define BATTERY_MONITOR_USE_DEEP_SLEEP_ON_LOW_BATTERY 1
-#define BATTERY_MEASUREMENTS_PER_CYCLE  1
-#endif
 
 // ============================================================================
 // I2C + Environment Task (AHT20) Configuration
@@ -77,14 +106,6 @@
 #ifndef CONFIG_ENV_ENABLE_LOGGING
 #define CONFIG_ENV_ENABLE_LOGGING 1
 #endif
-
-// ============================================================================
-// Deep Sleep Configuration
-// ============================================================================
-
-#define DEEP_SLEEP_ENABLED              1                   // Enable/disable deep sleep mode
-#define DEEP_SLEEP_DURATION_SECONDS     (CONFIG_ENV_SLEEP_SECONDS)  // From Kconfig (default 10s)
-#define DEEP_SLEEP_WAKEUP_DELAY_MS      100                 // Delay before entering deep sleep
 
 // ============================================================================
 // NTP Time Synchronization Configuration

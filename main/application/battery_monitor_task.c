@@ -2,9 +2,8 @@
  * @file battery_monitor_task.c
  * @brief Battery Voltage Monitoring Task - Implementation
  * 
- * Monitors battery voltage using ADC with reference counting for resource
- * management. Supports automatic calibration triggered by triple-reset,
- * stores calibration data in NVS, and sends measurements to InfluxDB.
+ * Simple battery voltage monitoring using ADC (direct 1:1 connection).
+ * Reads voltage from GPIO0 and sends measurements to InfluxDB.
  */
 
 #include "battery_monitor_task.h"
@@ -18,22 +17,11 @@
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_sleep.h"
-#include "nvs_flash.h"
-#include "nvs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <string.h>
-#include <sys/time.h>
 
 static const char* TAG = "BATTERY_MONITOR_TASK";
-
-// NVS keys for calibration
-#define NVS_NAMESPACE "battery_cal"
-#define NVS_KEY_RESET_COUNT "reset_count"
-#define NVS_KEY_LAST_RESET_TIME "last_reset"
-#define NVS_KEY_SCALE_FACTOR "scale_factor"
-#define CALIBRATION_RESET_THRESHOLD 3
-#define CALIBRATION_TIME_WINDOW_SEC 60
 
 // Task handle for the monitoring task
 static TaskHandle_t monitoring_task_handle = NULL;
@@ -41,197 +29,6 @@ static TaskHandle_t monitoring_task_handle = NULL;
 // Configuration for measurement cycles
 static uint32_t measurements_per_cycle = 0;  // 0 = infinite loop
 static volatile bool is_running = false;
-
-// Static scale factor that can be updated through calibration
-static float current_scale_factor = BATTERY_MONITOR_VOLTAGE_SCALE_FACTOR;
-
-/**
- * @brief Check if calibration mode should be triggered (3 resets within 1 minute)
- */
-bool battery_monitor_check_calibration_trigger() {
-    nvs_handle_t nvs_handle;
-    esp_err_t ret;
-    
-    // Initialize NVS if not already done
-    ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_LOGW(TAG, "NVS partition was truncated, erasing...");
-        nvs_flash_erase();
-        ret = nvs_flash_init();
-    }
-    
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize NVS: %s", esp_err_to_name(ret));
-        return false;
-    }
-    
-    // Open NVS namespace
-    ret = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to open NVS namespace: %s", esp_err_to_name(ret));
-        return false;
-    }
-    
-    // Get current time
-    struct timeval tv_now;
-    gettimeofday(&tv_now, NULL);
-    int64_t current_time = tv_now.tv_sec;
-    
-    // Read previous reset count and time
-    uint32_t reset_count = 0;
-    int64_t last_reset_time = 0;
-    
-    nvs_get_u32(nvs_handle, NVS_KEY_RESET_COUNT, &reset_count);
-    nvs_get_i64(nvs_handle, NVS_KEY_LAST_RESET_TIME, &last_reset_time);
-    
-    ESP_LOGI(TAG, "Reset tracking - Count: %lu, Last reset: %lld sec ago", 
-             reset_count, current_time - last_reset_time);
-    
-    // Check if resets are within time window
-    bool should_calibrate = false;
-    if ((current_time - last_reset_time) <= CALIBRATION_TIME_WINDOW_SEC) {
-        // Within time window, increment count
-        reset_count++;
-        ESP_LOGI(TAG, "Reset within time window, count now: %lu", reset_count);
-        
-        if (reset_count >= CALIBRATION_RESET_THRESHOLD) {
-            ESP_LOGI(TAG, "!!! CALIBRATION MODE TRIGGERED !!!");
-            should_calibrate = true;
-            reset_count = 0;  // Reset counter after triggering calibration
-        }
-    } else {
-        // Outside time window, reset count
-        ESP_LOGI(TAG, "Reset outside time window, resetting count");
-        reset_count = 1;
-    }
-    
-    // Save updated values
-    nvs_set_u32(nvs_handle, NVS_KEY_RESET_COUNT, reset_count);
-    nvs_set_i64(nvs_handle, NVS_KEY_LAST_RESET_TIME, current_time);
-    nvs_commit(nvs_handle);
-    nvs_close(nvs_handle);
-    
-    return should_calibrate;
-}
-
-/**
- * @brief Perform automatic calibration to match target voltage
- */
-esp_err_t battery_monitor_auto_calibrate(float target_voltage) {
-    if (target_voltage <= 0.0f) {
-        ESP_LOGE(TAG, "Invalid target voltage: %.3f", target_voltage);
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    ESP_LOGI(TAG, "========================================");
-    ESP_LOGI(TAG, "Starting battery ADC auto-calibration");
-    ESP_LOGI(TAG, "Target voltage: %.3f V", target_voltage);
-    ESP_LOGI(TAG, "========================================");
-    
-    // Initialize ADC for reading
-    esp_err_t ret = battery_monitor_init();
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize battery monitor for calibration");
-        return ret;
-    }
-    
-    // Read raw ADC voltage (without scale factor)
-    float raw_voltage = 0.0f;
-    ret = adc_shared_read_voltage(BATTERY_ADC_UNIT, BATTERY_ADC_CHANNEL, &raw_voltage);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to read raw voltage: %s", esp_err_to_name(ret));
-        battery_monitor_deinit();
-        return ret;
-    }
-    
-    ESP_LOGI(TAG, "Raw ADC voltage reading: %.3f V", raw_voltage);
-    
-    if (raw_voltage < 0.1f) {
-        ESP_LOGE(TAG, "Raw voltage too low (%.3f V), cannot calibrate", raw_voltage);
-        battery_monitor_deinit();
-        return ESP_ERR_INVALID_STATE;
-    }
-    
-    // Calculate new scale factor
-    float new_scale_factor = target_voltage / raw_voltage;
-    
-    ESP_LOGI(TAG, "Calculated scale factor: %.4f", new_scale_factor);
-    ESP_LOGI(TAG, "Old scale factor: %.4f", BATTERY_MONITOR_VOLTAGE_SCALE_FACTOR);
-    
-    // Sanity check on scale factor (should be between 1.0 and 10.0 for typical voltage dividers)
-    if (new_scale_factor < 1.0f || new_scale_factor > 10.0f) {
-        ESP_LOGW(TAG, "Calculated scale factor (%.4f) seems unusual, but will save it anyway", new_scale_factor);
-    }
-    
-    // Save new scale factor to NVS
-    nvs_handle_t nvs_handle;
-    ret = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to open NVS for saving calibration: %s", esp_err_to_name(ret));
-        battery_monitor_deinit();
-        return ret;
-    }
-    
-    // Save as float (stored as blob in NVS)
-    ret = nvs_set_blob(nvs_handle, NVS_KEY_SCALE_FACTOR, &new_scale_factor, sizeof(float));
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to save scale factor: %s", esp_err_to_name(ret));
-        nvs_close(nvs_handle);
-        battery_monitor_deinit();
-        return ret;
-    }
-    
-    ret = nvs_commit(nvs_handle);
-    nvs_close(nvs_handle);
-    
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to commit scale factor: %s", esp_err_to_name(ret));
-        battery_monitor_deinit();
-        return ret;
-    }
-    
-    // Update current scale factor
-    current_scale_factor = new_scale_factor;
-    
-    ESP_LOGI(TAG, "========================================");
-    ESP_LOGI(TAG, "Calibration successful!");
-    ESP_LOGI(TAG, "New scale factor saved: %.4f", new_scale_factor);
-    ESP_LOGI(TAG, "Expected reading: %.3f V", raw_voltage * new_scale_factor);
-    ESP_LOGI(TAG, "========================================");
-    ESP_LOGI(TAG, "Please update BATTERY_MONITOR_VOLTAGE_SCALE_FACTOR");
-    ESP_LOGI(TAG, "in esp32-config.h to: %.4f", new_scale_factor);
-    ESP_LOGI(TAG, "========================================");
-    
-    battery_monitor_deinit();
-    return ESP_OK;
-}
-
-/**
- * @brief Load calibrated scale factor from NVS if available
- */
-static void battery_monitor_load_scale_factor() {
-    nvs_handle_t nvs_handle;
-    esp_err_t ret = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle);
-    if (ret != ESP_OK) {
-        ESP_LOGD(TAG, "No saved scale factor found, using default");
-        return;
-    }
-    
-    float saved_scale_factor = 0.0f;
-    size_t required_size = sizeof(float);
-    ret = nvs_get_blob(nvs_handle, NVS_KEY_SCALE_FACTOR, &saved_scale_factor, &required_size);
-    
-    if (ret == ESP_OK && saved_scale_factor > 0.0f) {
-        current_scale_factor = saved_scale_factor;
-        ESP_LOGI(TAG, "Loaded calibrated scale factor: %.4f", current_scale_factor);
-        if (current_scale_factor != BATTERY_MONITOR_VOLTAGE_SCALE_FACTOR) {
-            ESP_LOGW(TAG, "Using calibrated value (%.4f) instead of config default (%.4f)", 
-                     current_scale_factor, BATTERY_MONITOR_VOLTAGE_SCALE_FACTOR);
-        }
-    }
-    
-    nvs_close(nvs_handle);
-}
 
 /**
  * @brief Send battery voltage reading to InfluxDB
@@ -263,10 +60,6 @@ static influxdb_response_status_t battery_send_reading_to_influxdb(float voltage
 }
 
 esp_err_t battery_monitor_init() {
-    
-    // Load calibrated scale factor from NVS if available
-    battery_monitor_load_scale_factor();
-    
     // Initialize shared ADC unit
     esp_err_t ret = adc_shared_init(BATTERY_ADC_UNIT);
     if (ret != ESP_OK) {
@@ -284,7 +77,8 @@ esp_err_t battery_monitor_init() {
         return ret;
     }
 
-    ESP_LOGI(TAG, "Battery monitor initialized on ADC%d CH%d", BATTERY_ADC_UNIT + 1, BATTERY_ADC_CHANNEL);
+    ESP_LOGI(TAG, "Battery monitor initialized on GPIO0 (ADC%d CH%d, 1:1 direct)", 
+             BATTERY_ADC_UNIT + 1, BATTERY_ADC_CHANNEL);
     return ESP_OK;
 }
 
@@ -311,14 +105,15 @@ esp_err_t battery_monitor_read_voltage(float* voltage) {
         return ESP_ERR_INVALID_ARG;
     }
 
+    // Read ADC voltage (direct 1:1, scale factor is 1.0)
     esp_err_t ret = adc_shared_read_voltage(BATTERY_ADC_UNIT, BATTERY_ADC_CHANNEL, voltage);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read battery voltage: %s", esp_err_to_name(ret));
         return ret;
     }
     
-    // Apply voltage scale factor (for voltage divider) - use calibrated value if available
-    *voltage = *voltage * current_scale_factor;
+    // Apply scale factor (1.0 for direct connection, configurable if needed)
+    *voltage = *voltage * BATTERY_MONITOR_VOLTAGE_SCALE_FACTOR;
 
     return ESP_OK;
 }
