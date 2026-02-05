@@ -2,7 +2,7 @@
 #   MAIN Application   #
 ########################
 
-idf_component_register(SRCS "soil_project_main.c"
+idf_component_register(SRCS "main.c"
                             "application/influx_sender.c"
                             "application/env_monitor_app.c"
                        INCLUDE_DIRS "."

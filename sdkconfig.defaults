@@ -1,0 +1,5 @@
+# Custom ESP-IDF Configuration Defaults
+# This file contains only the settings that differ from ESP-IDF defaults
+
+# Partition Table - Use large single app partition (3MB instead of 1MB)
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
