@@ -34,13 +34,8 @@ esp_err_t wifi_manager_init(const wifi_manager_config_t* config, wifi_status_cal
     s_wifi_config.max_retry = config->max_retry;
     s_status_callback = callback;
 
-    // Initialize NVS
-    ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
+    // NOTE: NVS and network stack MUST be initialized in app_main() before calling this!
+    // This is now handled in main.c app_main() function
 
     // Create event group
     s_wifi_event_group = xEventGroupCreate();
@@ -48,12 +43,6 @@ esp_err_t wifi_manager_init(const wifi_manager_config_t* config, wifi_status_cal
         ESP_LOGE(TAG, "Failed to create event group");
         return ESP_ERR_NO_MEM;
     }
-
-    // Initialize TCP/IP stack
-    ESP_ERROR_CHECK(esp_netif_init());
-    
-    // Create default event loop
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
     
     // Create default WiFi STA interface
     s_sta_netif = esp_netif_create_default_wifi_sta();

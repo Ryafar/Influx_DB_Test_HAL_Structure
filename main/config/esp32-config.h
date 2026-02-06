@@ -87,8 +87,8 @@
 // ============================================================================
 
 #define I2C_PORT                     I2C_NUM_0
-#define I2C_SDA_PIN                  GPIO_NUM_7 // GPIO7, GPIO8 has RGB LED on ESP32-C3 devkit
-#define I2C_SCL_PIN                  GPIO_NUM_9
+#define I2C_SDA_PIN                  GPIO_NUM_6 // Changed from GPIO7
+#define I2C_SCL_PIN                  GPIO_NUM_7 // CRITICAL: GPIO9 is boot strapping pin! Changed to GPIO7
 #define I2C_FREQ_HZ                  100000
 
 #define ENV_TASK_STACK_SIZE          (8 * 1024)   // Increased to reduce stack pressure during logging/formatting

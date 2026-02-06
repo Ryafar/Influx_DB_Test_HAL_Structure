@@ -1,5 +1,12 @@
 # Custom ESP-IDF Configuration Defaults
 # This file contains only the settings that differ from ESP-IDF defaults
 
+# Flash Size - ESP32-C6FH4 has 4MB flash
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+
 # Partition Table - Use large single app partition (3MB instead of 1MB)
 CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+
+# Console Configuration - USB-Serial-JTAG as PRIMARY console (board has no USB-UART chip!)
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
