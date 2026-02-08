@@ -18,7 +18,7 @@
 
 #define ENABLE_ENV_MONITOR      0    // AHT20 temperature/humidity sensor
 #define ENABLE_BATTERY_MONITOR  1    // Battery voltage monitoring via ADC
-#define ENABLE_SOIL_MONITOR     0    // Soil moisture monitoring via ADC
+#define ENABLE_SOIL_MONITOR     1    // Soil moisture monitoring via ADC
 
 // ============================================================================
 // Deep Sleep Configuration
@@ -32,7 +32,8 @@
 // GPIO Pin Assignments
 // ============================================================================
 
-#define LED_GPIO_NUM           GPIO_NUM_22
+
+
 
 // ============================================================================
 // Battery Monitor Configuration (if enabled)
@@ -63,19 +64,16 @@
 // ============================================================================
 
 #define SOIL_ADC_UNIT               ADC_UNIT_1
-#define SOIL_ADC_CHANNEL            ADC_CHANNEL_0
+#define SOIL_ADC_CHANNEL            ADC_CHANNEL_1      // GPIO1 (moved from GPIO0)
 #define SOIL_ADC_BITWIDTH           ADC_BITWIDTH_12
 #define SOIL_ADC_ATTENUATION        ADC_ATTEN_DB_12
 #define SOIL_ADC_VREF               3.3f
 
-#define SOIL_SENSOR_POWER_PIN       GPIO_NUM_19
+#define SOIL_SENSOR_POWER_PIN       GPIO_NUM_2     // GPIO2 controls power to the soil sensor (moved from GPIO9 which is a boot strapping pin)
 
 #define SOIL_TASK_STACK_SIZE            (4 * 1024)
 #define SOIL_TASK_PRIORITY              5
 #define SOIL_TASK_NAME                  "soil_monitor"
-#define SOIL_AUTO_CALIBRATION_ENABLE    0
-#define SOIL_CALIBRATION_TIMEOUT_MS     10000
-#define SOIL_CALIBRATION_SAMPLES        10
 #define SOIL_DRY_VOLTAGE_DEFAULT        3.0f
 #define SOIL_WET_VOLTAGE_DEFAULT        1.0f
 #define SOIL_MEASUREMENT_INTERVAL_MS    (10 * 1000)

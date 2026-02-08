@@ -176,72 +176,22 @@ esp_err_t soil_monitor_init(soil_monitor_app_t* app, const soil_monitor_config_t
         return ret;
     }
     
-    // Initialize WiFi
-    wifi_manager_config_t wifi_config = {
-        .ssid = WIFI_SSID,
-        .password = WIFI_PASSWORD,
-        .max_retry = WIFI_MAX_RETRY,
-    };
-    influxdb_client_config_t influx_config = {
-        .port = INFLUXDB_PORT,
-        .timeout_ms = HTTP_TIMEOUT_MS,
-        .max_retries = HTTP_MAX_RETRIES,
-    };
-    
-    // Copy configuration strings
-    strncpy(influx_config.server, INFLUXDB_SERVER, sizeof(influx_config.server) - 1);
-    influx_config.server[sizeof(influx_config.server) - 1] = '\0';
-    
-    strncpy(influx_config.bucket, INFLUXDB_BUCKET, sizeof(influx_config.bucket) - 1);
-    influx_config.bucket[sizeof(influx_config.bucket) - 1] = '\0';
-    
-    strncpy(influx_config.org, INFLUXDB_ORG, sizeof(influx_config.org) - 1);
-    influx_config.org[sizeof(influx_config.org) - 1] = '\0';
-    
-    strncpy(influx_config.token, INFLUXDB_TOKEN, sizeof(influx_config.token) - 1);
-    influx_config.token[sizeof(influx_config.token) - 1] = '\0';
-    
-    strncpy(influx_config.endpoint, INFLUXDB_ENDPOINT, sizeof(influx_config.endpoint) - 1);
-    influx_config.endpoint[sizeof(influx_config.endpoint) - 1] = '\0';
-
-    wifi_manager_init(&wifi_config, NULL);
-    wifi_manager_connect();
-    
-    // Wait for WiFi connection and log network info
-    ESP_LOGI(TAG, "Waiting for WiFi connection...");
-    int wifi_wait_count = 0;
-    while (!wifi_manager_is_connected() && wifi_wait_count < 30) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        wifi_wait_count++;
-        ESP_LOGI(TAG, "WiFi connection attempt %d/30", wifi_wait_count);
-    }
-    
-    if (wifi_manager_is_connected()) {
-        // Get and log IP information
-        esp_netif_ip_info_t ip_info;
-        esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-        if (netif != NULL && esp_netif_get_ip_info(netif, &ip_info) == ESP_OK) {
-            ESP_LOGI(TAG, "=== NETWORK DIAGNOSTICS ===");
-            ESP_LOGI(TAG, "ESP32 IP: " IPSTR, IP2STR(&ip_info.ip));
-            ESP_LOGI(TAG, "Gateway: " IPSTR, IP2STR(&ip_info.gw));
-            ESP_LOGI(TAG, "Netmask: " IPSTR, IP2STR(&ip_info.netmask));
-            ESP_LOGI(TAG, "Target Server: %s:%d", INFLUXDB_SERVER, INFLUXDB_PORT);
-            ESP_LOGI(TAG, "========================");
+    // Check if WiFi is already connected (initialized by main)
+    if (!wifi_manager_is_connected()) {
+        ESP_LOGW(TAG, "WiFi not connected, waiting for connection...");
+        int wifi_wait_count = 0;
+        while (!wifi_manager_is_connected() && wifi_wait_count < 30) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            wifi_wait_count++;
         }
-    } else {
-        ESP_LOGE(TAG, "WiFi connection failed after 30 seconds!");
-        return ESP_FAIL;
+        
+        if (!wifi_manager_is_connected()) {
+            ESP_LOGE(TAG, "WiFi connection timeout");
+            return ESP_ERR_TIMEOUT;
+        }
     }
     
-    // Initialize InfluxDB client (HTTP/TLS) and sender task
-    esp_err_t influx_ret = influxdb_client_init(&influx_config);
-    if (influx_ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize InfluxDB client: %s", esp_err_to_name(influx_ret));
-        return influx_ret;
-    }
-
-    // Ensure sender is ready (idempotent)
-    influx_sender_init();
+    ESP_LOGI(TAG, "WiFi is connected - using shared WiFi and InfluxDB instances");
     
     // Heavy operations moved to task above to avoid main stack overflow
 

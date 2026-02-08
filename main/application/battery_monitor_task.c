@@ -121,12 +121,8 @@ esp_err_t battery_monitor_read_voltage(float* voltage) {
     
     int raw_avg = (int)(raw_sum / samples);
 
-    // Convert average raw value to calibrated voltage
-    int voltage_mv = 0;
-    esp_err_t ret = ESP_OK;
-    
-    // Use calibration if available
-    ret = adc_shared_read_voltage(BATTERY_ADC_UNIT, BATTERY_ADC_CHANNEL, voltage);
+    // Read calibrated voltage using the averaged raw value
+    esp_err_t ret = adc_shared_read_voltage(BATTERY_ADC_UNIT, BATTERY_ADC_CHANNEL, voltage);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read battery voltage: %s", esp_err_to_name(ret));
         return ret;
@@ -223,10 +219,6 @@ esp_err_t battery_monitor_wait_for_completion(uint32_t timeout_ms) {
 }
 
 void battery_monitor_task(void *pvParameters) {
-
-    // turn on the led
-    led_init(LED_GPIO_NUM);
-    led_set_state(LED_GPIO_NUM, true);
 
     battery_monitor_init();
 

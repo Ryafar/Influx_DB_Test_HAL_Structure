@@ -34,6 +34,8 @@
 
 #if ENABLE_SOIL_MONITOR
 #include "application/soil_monitor_app.h"
+
+static soil_monitor_app_t soil_app;
 #endif
 
 static const char *TAG = "MAIN";
@@ -153,7 +155,15 @@ static esp_err_t init_sensors(void) {
 
 #if ENABLE_SOIL_MONITOR
     ESP_LOGI(TAG, "Initializing Soil Monitor...");
-    // Add soil monitor init here when ready
+    soil_monitor_config_t soil_config;
+    soil_monitor_get_default_config(&soil_config);
+    soil_config.measurements_per_cycle = SOIL_MEASUREMENTS_PER_CYCLE;
+    
+    ret = soil_monitor_init(&soil_app, &soil_config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize soil monitor: %s", esp_err_to_name(ret));
+        return ret;
+    }
     ESP_LOGI(TAG, "Soil Monitor initialized");
 #endif
 
@@ -189,14 +199,19 @@ static esp_err_t run_measurement_cycle(void) {
     }
 #endif
 
-#if ENABLE_ENV_MONITOR
-    ESP_LOGI(TAG, "Reading environment sensor...");
-    // ENV monitor reading logic here when enabled
-#endif
-
 #if ENABLE_SOIL_MONITOR
-    ESP_LOGI(TAG, "Reading soil moisture...");
-    // Soil monitor reading logic here when enabled
+    ESP_LOGI(TAG, "Starting soil monitor task...");
+    ret = soil_monitor_start(&soil_app);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start soil monitor: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    // Wait for soil monitoring to complete
+    ret = soil_monitor_wait_for_completion(&soil_app, 30000);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Soil monitor timeout: %s", esp_err_to_name(ret));
+    }
 #endif
     
     // Wait for InfluxDB transmission to complete
@@ -250,9 +265,9 @@ void app_main(void) {
         return;
     }
     
-    // Initialize sensors (only once)
+    // Initialize sensors (only once), inits battery, env, soil monitors as needed
     ESP_LOGI(TAG, "Initializing sensors...");
-    if (init_sensors() != ESP_OK) {
+    if (init_sensors() != ESP_OK) { 
         ESP_LOGE(TAG, "Sensor initialization failed! Retrying in 60s...");
         vTaskDelay(pdMS_TO_TICKS(60000));
         esp_restart();

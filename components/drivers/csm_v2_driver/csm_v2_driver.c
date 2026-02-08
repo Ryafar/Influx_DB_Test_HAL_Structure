@@ -121,13 +121,30 @@ esp_err_t csm_v2_read_voltage(csm_v2_driver_t* driver, float* voltage) {
         return ESP_ERR_INVALID_STATE;
     }
     
+    // Multisampling to reduce noise (recommended by Espressif)
+    const int samples = 64;  // Average 64 readings
+    int64_t raw_sum = 0;
+    
+    for (int i = 0; i < samples; i++) {
+        int raw_value;
+        esp_err_t ret = adc_shared_read_raw(driver->config.adc_unit, driver->config.adc_channel, &raw_value);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to read raw ADC: %s", esp_err_to_name(ret));
+            return ret;
+        }
+        raw_sum += raw_value;
+    }
+    
+    int raw_avg = (int)(raw_sum / samples);
+    
+    // Convert average to voltage using calibration
     esp_err_t ret = adc_shared_read_voltage(driver->config.adc_unit, driver->config.adc_channel, voltage);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read voltage: %s", esp_err_to_name(ret));
         return ret;
     }
     
-    ESP_LOGD(TAG, "Voltage reading: %.3f V", *voltage);
+    ESP_LOGD(TAG, "Soil: RawAvg=%d (n=%d), Voltage=%.3fV", raw_avg, samples, *voltage);
     return ESP_OK;
 }
 

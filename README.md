@@ -5,22 +5,39 @@ A power-efficient ESP32-C6 application that monitors temperature and humidity us
 ## Features
 
 - 🌡️ **AHT20 Temperature & Humidity Sensing** via I2C
+- � **Battery Voltage Monitoring** with ADC calibration and voltage divider support
+- 🌱 **Soil Moisture Monitoring** with capacitive sensor and power management
 - 📡 **WiFi Connectivity** with automatic reconnection
-- 📊 **InfluxDB Integration** for time-series data storage
+- 📊 **InfluxDB Integration** for time-series data storage (HTTPS support)
 - ⚡ **Deep Sleep Power Management** for battery operation
 - 🔄 **Configurable Wake Cycles** and measurement intervals
 - 🕐 **Optional NTP Time Sync** (can use server timestamps)
 - 📝 **Async Data Transmission** with queue management
+- 📏 **ESP32-C6 eFuse ADC Calibration** with curve fitting for accurate voltage readings
+- 📊 **64-Sample Multisampling** for noise reduction on ADC channels
+- 🏗️ **Modular Architecture** with shared WiFi and InfluxDB instances
 
 ## Hardware Requirements
 
 - **ESP32-C6** development board
-- **AHT20** temperature/humidity sensor
-- I2C connections:
+- **AHT20** temperature/humidity sensor (optional, enabled via config)
+- **Capacitive Soil Moisture Sensor** (optional, enabled via config)
+- **Battery voltage divider** (optional, enabled via config)
+
+### Pin Connections
+
+**I2C (AHT20):**
   - SDA: GPIO7
   - SCL: GPIO9
   - Power: 3.3V
   - Ground: GND
+
+**ADC Sensors:**
+  - Battery Voltage: GPIO0 (ADC1 Channel 0) with 2:1 voltage divider
+  - Soil Moisture: GPIO1 (ADC1 Channel 1)
+  - Soil Power Control: GPIO2 (powers sensor on/off)
+
+**Note:** GPIO0 is a strapping pin on ESP32-C6 and may have a slight voltage offset (~1V) even when grounded. Consider using a non-strapping pin (GPIO2, GPIO3, etc.) for critical voltage measurements if needed.
 
 ## Project Structure
 
@@ -149,18 +166,30 @@ Each enabled feature has its own configuration block in the same file:
 ```c
 #define BATTERY_ADC_UNIT                        ADC_UNIT_1
 #define BATTERY_ADC_CHANNEL                     ADC_CHANNEL_0      // GPIO0 on ESP32-C6
-#define BATTERY_MONITOR_VOLTAGE_SCALE_FACTOR    2.0f              // Voltage divider
-#define BATTERY_MONITOR_LOW_VOLTAGE_THRESHOLD   3.2f              // Low battery alert
+#define BATTERY_ADC_ATTENUATION                 ADC_ATTEN_DB_12    // 0-3.3V range
+#define BATTERY_MONITOR_VOLTAGE_SCALE_FACTOR    2.0f               // Voltage divider (2x)
+#define BATTERY_MONITOR_LOW_VOLTAGE_THRESHOLD   3.2f               // Low battery alert
 ```
+
+**ADC Calibration:**
+- Uses ESP32-C6 factory eFuse calibration data (curve fitting scheme)
+- 64-sample averaging for noise reduction
+- Automatic channel-specific calibration on initialization
 
 **Soil Monitor (when `ENABLE_SOIL_MONITOR = 1`):**
 ```c
 #define SOIL_ADC_UNIT               ADC_UNIT_1
-#define SOIL_ADC_CHANNEL            ADC_CHANNEL_0
-#define SOIL_SENSOR_POWER_PIN       GPIO_NUM_19    // GPIO to power sensor
-#define SOIL_DRY_VOLTAGE_DEFAULT    3.0f
-#define SOIL_WET_VOLTAGE_DEFAULT    1.0f
+#define SOIL_ADC_CHANNEL            ADC_CHANNEL_1      // GPIO1 on ESP32-C6
+#define SOIL_ADC_ATTENUATION        ADC_ATTEN_DB_12    // 0-3.3V range
+#define SOIL_SENSOR_POWER_PIN       GPIO_NUM_19        // Power control (on/off)
+#define SOIL_DRY_VOLTAGE_DEFAULT    3.0f               // Calibration: dry soil
+#define SOIL_WET_VOLTAGE_DEFAULT    1.0f               // Calibration: wet soil
 ```
+
+**Features:**
+- Power control via GPIO19 (sensor powered off between readings)
+- Same eFuse calibration and multisampling as battery monitor
+- Automatic moisture percentage calculation from voltage
 
 **Environment Monitor (always on):**
 ```c
@@ -236,17 +265,19 @@ That's it! No menuconfig, no separate files, just edit one header and rebuild.
 ### Execution Flow
 
 1. **Wake Up** - ESP32 wakes from deep sleep or boots
-2. **Initialize**
-   - Connect to WiFi
-   - Initialize AHT20 sensor
-   - Setup InfluxDB sender queue
+2. **Initialize** (shared resources, once per boot)
+   - Connect to WiFi (shared instance)
+   - Setup InfluxDB sender queue (shared instance)
+   - Initialize enabled sensors (ADC manager, AHT20, etc.)
    - Optional: Sync NTP time
-3. **Measure**
-   - Read temperature & humidity from AHT20
-   - Take configured number of measurements
+3. **Measure** (runs for each enabled sensor)
+   - **Battery Monitor**: Read voltage with 64-sample averaging, apply voltage divider scaling
+   - **Soil Monitor**: Power on sensor → wait → read moisture with calibration → power off
+   - **Environment Monitor**: Read temperature & humidity from AHT20
 4. **Transmit**
-   - Queue data to InfluxDB via HTTP POST
-   - Wait for transmission to complete
+   - All sensors queue data to shared InfluxDB sender
+   - Async transmission via HTTPS with TLS certificate validation
+   - Wait for all transmissions to complete (HTTP 204 = success)
 5. **Sleep**
    - Clean up resources
    - Enter deep sleep for configured duration
@@ -262,9 +293,23 @@ The device uses ESP32 deep sleep mode to minimize power consumption:
 ### Data Format
 
 Data is sent to InfluxDB in Line Protocol format:
+
+**Environment (AHT20):**
 ```
-environment,device=<device_id> temperature=<value>,humidity=<value> <timestamp_ns>
+environment,device=ENV_<MAC> temperature=<value>,humidity=<value> <timestamp_ns>
 ```
+
+**Battery:**
+```
+battery,device=BATT_<MAC> voltage=<value> <timestamp_ns>
+```
+
+**Soil Moisture:**
+```
+soil_moisture,device=SOIL_<MAC> voltage=<value>,moisture_percent=<value>,raw_adc=<value> <timestamp_ns>
+```
+
+All measurements are sent to the same InfluxDB bucket (`ESP32Data`) but use different measurement names for easy querying.
 
 ## Troubleshooting
 
@@ -290,6 +335,13 @@ environment,device=<device_id> temperature=<value>,humidity=<value> <timestamp_n
 - Verify I2C wiring (SDA=GPIO7, SCL=GPIO9)
 - Check AHT20 power supply (3.3V)
 - Run `idf.py monitor` to see error messages
+
+**ADC readings incorrect:**
+- Ensure using `ADC_ATTEN_DB_12` (not deprecated `ADC_ATTEN_DB_11`)
+- Verify eFuse calibration is enabled (check logs for "Calibration enabled")
+- Check voltage divider values match configuration
+- GPIO0 may have ~1V offset due to strapping pin pull-ups
+- Multisampling (64 samples) helps reduce noise
 
 **InfluxDB data not appearing:**
 - Verify INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG, and INFLUXDB_BUCKET in `credentials.h`
