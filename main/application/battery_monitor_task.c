@@ -237,17 +237,18 @@ void battery_monitor_task(void *pvParameters) {
         }
 #endif
 
-        if (battery_voltage < BATTERY_MONITOR_LOW_VOLTAGE_THRESHOLD) {
-            ESP_LOGW(TAG, "Battery voltage low: %.2f V", battery_voltage);
-            ESP_LOGW(TAG, "Please recharge or replace the battery. Shutting down.");
+        // MARK: TODO - Add low battery handling logic here if desired (e.g. deep sleep on low battery)
+        // if (battery_voltage < BATTERY_MONITOR_LOW_VOLTAGE_THRESHOLD) {
+        //     ESP_LOGW(TAG, "Battery voltage low: %.2f V", battery_voltage);
+        //     ESP_LOGW(TAG, "Please recharge or replace the battery. Shutting down.");
             
-            // Perform cleanup and shutdown
-            if (BATTERY_MONITOR_USE_DEEP_SLEEP_ON_LOW_BATTERY) {
-                ESP_LOGI(TAG, "Entering deep sleep mode to conserve power.");
-                battery_monitor_deinit();
-                esp_deep_sleep_start();
-            }
-        }
+        //     // Perform cleanup and shutdown
+        //     if (BATTERY_MONITOR_USE_DEEP_SLEEP_ON_LOW_BATTERY) {
+        //         ESP_LOGI(TAG, "Entering deep sleep mode to conserve power.");
+        //         battery_monitor_deinit();
+        //         esp_deep_sleep_start();
+        //     }
+        // }
 
         measurement_count++;
         

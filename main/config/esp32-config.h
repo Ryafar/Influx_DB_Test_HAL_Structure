@@ -25,7 +25,7 @@
 // Deep Sleep Configuration
 // ============================================================================
 
-#define DEEP_SLEEP_ENABLED              1                   // Enable/disable deep sleep mode (0 = restart after measurements)
+#define DEEP_SLEEP_ENABLED              0                   // Enable/disable deep sleep mode (0 = continuous loop with delay)
 #define DEEP_SLEEP_DURATION_SECONDS     10                  // Sleep duration between measurement cycles
 #define DEEP_SLEEP_WAKEUP_DELAY_MS      100                 // Delay before entering deep sleep
 
@@ -47,11 +47,11 @@
 #define BATTERY_ADC_ATTENUATION                 ADC_ATTEN_DB_11
 #define BATTERY_ADC_VREF                        3.3f
 
-#define BATTERY_MONITOR_VOLTAGE_SCALE_FACTOR    1.0f    // Direct 1:1 connection (no voltage divider)
+#define BATTERY_MONITOR_VOLTAGE_SCALE_FACTOR    2.0f    // 2:1 voltage divider (two 10kΩ resistors)
 #define BATTERY_MONITOR_LOW_VOLTAGE_THRESHOLD   3.2f    // Low battery threshold in volts
 #define BATTERY_MONITOR_USE_DEEP_SLEEP_ON_LOW_BATTERY  1
 
-#define BATTERY_MONITOR_TASK_STACK_SIZE         (4 * 1024)
+#define BATTERY_MONITOR_TASK_STACK_SIZE         (8 * 1024)
 #define BATTERY_MONITOR_TASK_PRIORITY           5
 #define BATTERY_MONITOR_TASK_NAME               "battery_monitor"
 #define BATTERY_MONITOR_MEASUREMENT_INTERVAL_MS (10 * 1000)
@@ -88,7 +88,7 @@
 
 #define I2C_PORT                     I2C_NUM_0
 #define I2C_SDA_PIN                  GPIO_NUM_6 // Changed from GPIO7
-#define I2C_SCL_PIN                  GPIO_NUM_7 // CRITICAL: GPIO9 is boot strapping pin! Changed to GPIO7
+#define I2C_SCL_PIN                  GPIO_NUM_19 // CRITICAL: GPIO9 is boot strapping pin! Changed to GPIO19    
 #define I2C_FREQ_HZ                  100000
 
 #define ENV_TASK_STACK_SIZE          (8 * 1024)   // Increased to reduce stack pressure during logging/formatting
