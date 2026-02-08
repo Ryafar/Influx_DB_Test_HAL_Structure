@@ -9,7 +9,6 @@
 #ifndef ESP32_CONFIG_H
 #define ESP32_CONFIG_H
 
-#include "credentials.h"
 #include "driver/gpio.h"
 #include "esp_adc/adc_oneshot.h"
 
@@ -44,10 +43,10 @@
 #define BATTERY_ADC_UNIT                        ADC_UNIT_1
 #define BATTERY_ADC_CHANNEL                     ADC_CHANNEL_0      // GPIO0
 #define BATTERY_ADC_BITWIDTH                    ADC_BITWIDTH_12
-#define BATTERY_ADC_ATTENUATION                 ADC_ATTEN_DB_11
+#define BATTERY_ADC_ATTENUATION                 ADC_ATTEN_DB_12
 #define BATTERY_ADC_VREF                        3.3f
 
-#define BATTERY_MONITOR_VOLTAGE_SCALE_FACTOR    2.0f    // 2:1 voltage divider (two 10kΩ resistors)
+#define BATTERY_MONITOR_VOLTAGE_SCALE_FACTOR    2.0f   // 2:1 voltage divider (two 10kΩ resistors)
 #define BATTERY_MONITOR_LOW_VOLTAGE_THRESHOLD   3.2f    // Low battery threshold in volts
 #define BATTERY_MONITOR_USE_DEEP_SLEEP_ON_LOW_BATTERY  1
 
@@ -66,7 +65,7 @@
 #define SOIL_ADC_UNIT               ADC_UNIT_1
 #define SOIL_ADC_CHANNEL            ADC_CHANNEL_0
 #define SOIL_ADC_BITWIDTH           ADC_BITWIDTH_12
-#define SOIL_ADC_ATTENUATION        ADC_ATTEN_DB_11
+#define SOIL_ADC_ATTENUATION        ADC_ATTEN_DB_12
 #define SOIL_ADC_VREF               3.3f
 
 #define SOIL_SENSOR_POWER_PIN       GPIO_NUM_19

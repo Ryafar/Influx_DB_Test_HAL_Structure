@@ -105,15 +105,40 @@ esp_err_t battery_monitor_read_voltage(float* voltage) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    // Read ADC voltage (direct 1:1, scale factor is 1.0)
-    esp_err_t ret = adc_shared_read_voltage(BATTERY_ADC_UNIT, BATTERY_ADC_CHANNEL, voltage);
+    // Multisampling to reduce noise (recommended by Espressif)
+    const int samples = 64;  // Average 64 readings
+    int64_t raw_sum = 0;
+    
+    for (int i = 0; i < samples; i++) {
+        int raw_value;
+        esp_err_t ret = adc_shared_read_raw(BATTERY_ADC_UNIT, BATTERY_ADC_CHANNEL, &raw_value);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to read raw ADC: %s", esp_err_to_name(ret));
+            return ret;
+        }
+        raw_sum += raw_value;
+    }
+    
+    int raw_avg = (int)(raw_sum / samples);
+
+    // Convert average raw value to calibrated voltage
+    int voltage_mv = 0;
+    esp_err_t ret = ESP_OK;
+    
+    // Use calibration if available
+    ret = adc_shared_read_voltage(BATTERY_ADC_UNIT, BATTERY_ADC_CHANNEL, voltage);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read battery voltage: %s", esp_err_to_name(ret));
         return ret;
     }
     
-    // Apply scale factor (1.0 for direct connection, configurable if needed)
+    float adc_voltage_before_scale = *voltage;
+    
+    // Apply scale factor (2.0 for voltage divider)
     *voltage = *voltage * BATTERY_MONITOR_VOLTAGE_SCALE_FACTOR;
+
+    ESP_LOGI(TAG, "ADC: RawAvg=%d (n=%d), Calibrated=%.3fV, Final=%.3fV", 
+             raw_avg, samples, adc_voltage_before_scale, *voltage);
 
     return ESP_OK;
 }

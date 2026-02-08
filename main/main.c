@@ -18,6 +18,7 @@
 #include "nvs_flash.h"
 
 #include "config/esp32-config.h"
+#include "config/credentials.h"
 #include "wifi_manager.h"
 #include "application/influx_sender.h"
 #include "influxdb_client.h"

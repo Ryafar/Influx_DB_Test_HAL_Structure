@@ -50,7 +50,7 @@ esp_err_t csm_v2_init(csm_v2_driver_t* driver, const csm_v2_config_t* config) {
     
     // Add soil sensor channel to shared ADC
     ret = adc_shared_add_channel(config->adc_unit, config->adc_channel, 
-                                 ADC_BITWIDTH_DEFAULT, ADC_ATTEN_DB_11, 3.3f);
+                                 ADC_BITWIDTH_DEFAULT, ADC_ATTEN_DB_12, 3.3f);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add soil sensor channel to shared ADC: %s", esp_err_to_name(ret));
         adc_shared_deinit(config->adc_unit);

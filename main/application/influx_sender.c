@@ -10,6 +10,8 @@
 #include "influx_sender.h"
 #include "esp_log.h"
 #include "string.h"
+#include "../config/esp32-config.h"
+#include "../config/credentials.h"
 
 #define INFLUX_SENDER_STACK   (14 * 1024)
 #define INFLUX_SENDER_PRIO    5
@@ -62,6 +64,30 @@ static void influx_sender_task(void* pv) {
 }
 
 esp_err_t influx_sender_init(void) {
+    static bool client_initialized = false;
+    
+    // Initialize InfluxDB client once
+    if (!client_initialized) {
+        influxdb_client_config_t influx_config = {
+            .server = INFLUXDB_SERVER,
+            .port = INFLUXDB_PORT,
+            .bucket = INFLUXDB_BUCKET,
+            .org = INFLUXDB_ORG,
+            .endpoint = INFLUXDB_ENDPOINT,
+            .timeout_ms = 10000,
+        };
+        strncpy(influx_config.token, INFLUXDB_TOKEN, sizeof(influx_config.token) - 1);
+        influx_config.token[sizeof(influx_config.token) - 1] = '\0';
+        
+        esp_err_t ret = influxdb_client_init(&influx_config);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to initialize InfluxDB client");
+            return ret;
+        }
+        client_initialized = true;
+        ESP_LOGI(TAG, "InfluxDB client initialized");
+    }
+    
     if (s_queue == NULL) {
         s_queue = xQueueCreate(INFLUX_QUEUE_LEN, sizeof(influx_msg_t));
         if (!s_queue) {

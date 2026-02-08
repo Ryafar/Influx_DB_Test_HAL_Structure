@@ -19,7 +19,7 @@ void adc_hal_get_default_config(adc_hal_config_t* config, adc_unit_t unit, adc_c
     config->unit = unit;
     config->channel = channel;
     config->bitwidth = ADC_BITWIDTH_DEFAULT;
-    config->attenuation = ADC_ATTEN_DB_11;  // 0-3.3V range
+    config->attenuation = ADC_ATTEN_DB_12;  // 0-3.3V range
     config->reference_voltage = 3.3f;
 }
 

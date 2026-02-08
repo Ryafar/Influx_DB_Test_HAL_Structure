@@ -142,6 +142,24 @@ esp_err_t adc_shared_add_channel(adc_unit_t unit, adc_channel_t channel,
     shared_unit->channels[channel].attenuation = attenuation;
     shared_unit->channels[channel].reference_voltage = reference_voltage;
     shared_unit->channels[channel].is_configured = true;
+    shared_unit->channels[channel].cali_enabled = false;
+    
+    // Initialize ADC calibration (ESP32-C6 uses curve fitting and requires channel!)
+    adc_cali_curve_fitting_config_t cali_config = {
+        .unit_id = unit,
+        .chan = channel,        // Channel-specific calibration
+        .atten = attenuation,
+        .bitwidth = bitwidth,
+    };
+    
+    ret = adc_cali_create_scheme_curve_fitting(&cali_config, &shared_unit->channels[channel].cali_handle);
+    if (ret == ESP_OK) {
+        shared_unit->channels[channel].cali_enabled = true;
+        ESP_LOGI(TAG, "ADC channel %d on unit %d: Calibration enabled (curve fitting)", channel, unit);
+    } else {
+        ESP_LOGW(TAG, "ADC channel %d on unit %d: Calibration failed (%s), using linear conversion",
+                 channel, unit, esp_err_to_name(ret));
+    }
     
     ESP_LOGI(TAG, "ADC channel %d configured on unit %d successfully", channel, unit);
     return ESP_OK;
@@ -206,7 +224,20 @@ esp_err_t adc_shared_read_voltage(adc_unit_t unit, adc_channel_t channel, float*
     
     adc_shared_channel_config_t* ch_config = &shared_unit->channels[channel];
     
-    // Calculate maximum ADC value based on bitwidth
+    // Use calibrated conversion if available
+    if (ch_config->cali_enabled) {
+        int voltage_mv = 0;
+        ret = adc_cali_raw_to_voltage(ch_config->cali_handle, raw_value, &voltage_mv);
+        if (ret == ESP_OK) {
+            *voltage = voltage_mv / 1000.0f;  // Convert mV to V
+            ESP_LOGD(TAG, "ADC unit %d channel %d: Raw: %d, Calibrated Voltage: %.3f V", 
+                     unit, channel, raw_value, *voltage);
+            return ESP_OK;
+        }
+        ESP_LOGW(TAG, "ADC calibration conversion failed, falling back to linear");
+    }
+    
+    // Fallback to linear conversion if calibration not available
     int max_adc_value;
     switch (ch_config->bitwidth) {
         case ADC_BITWIDTH_9:
@@ -222,14 +253,13 @@ esp_err_t adc_shared_read_voltage(adc_unit_t unit, adc_channel_t channel, float*
             max_adc_value = 4095;
             break;
         default:
-            max_adc_value = 4095;  // Default to 12-bit
+            max_adc_value = 4095;
             break;
     }
     
-    // Convert to voltage
     *voltage = ((float)raw_value / (float)max_adc_value) * ch_config->reference_voltage;
     
-    ESP_LOGD(TAG, "ADC unit %d channel %d: Raw: %d, Voltage: %.3f V", unit, channel, raw_value, *voltage);
+    ESP_LOGD(TAG, "ADC unit %d channel %d: Raw: %d, Linear Voltage: %.3f V", unit, channel, raw_value, *voltage);
     return ESP_OK;
 }
 
@@ -243,6 +273,13 @@ esp_err_t adc_shared_remove_channel(adc_unit_t unit, adc_channel_t channel) {
     if (channel >= ADC_SHARED_MAX_CHANNELS) {
         ESP_LOGE(TAG, "Invalid ADC channel: %d", channel);
         return ESP_ERR_INVALID_ARG;
+    }
+    
+    // Delete calibration handle if it exists
+    if (shared_unit->channels[channel].cali_enabled) {
+        adc_cali_delete_scheme_curve_fitting(shared_unit->channels[channel].cali_handle);
+        shared_unit->channels[channel].cali_enabled = false;
+        ESP_LOGD(TAG, "ADC calibration deleted for channel %d", channel);
     }
     
     shared_unit->channels[channel].is_configured = false;
