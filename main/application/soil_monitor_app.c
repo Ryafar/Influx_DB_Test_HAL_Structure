@@ -137,12 +137,12 @@ void soil_monitor_get_default_config(soil_monitor_config_t* config) {
         return;
     }
     
-    config->adc_unit = ADC_UNIT_1;
-    config->adc_channel = ADC_CHANNEL_0;
+    config->adc_unit = SOIL_ADC_UNIT;
+    config->adc_channel = SOIL_ADC_CHANNEL;
     config->measurement_interval_ms = 1000;
     config->enable_logging = true;
-    config->dry_calibration_voltage = 3.0f;
-    config->wet_calibration_voltage = 1.0f;
+    config->dry_calibration_voltage = SOIL_DRY_VOLTAGE_DEFAULT;
+    config->wet_calibration_voltage = SOIL_WET_VOLTAGE_DEFAULT;
     config->enable_wifi = true;
     config->enable_http_sending = true;
     config->measurements_per_cycle = 0;  // 0 = infinite loop
