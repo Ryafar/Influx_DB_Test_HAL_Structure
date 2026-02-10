@@ -19,7 +19,7 @@
 // Feature Toggles - Enable/Disable Monitoring Modules
 // ============================================================================
 
-#define ENABLE_ENV_MONITOR      0    // AHT20 temperature/humidity sensor
+#define ENABLE_ENV_MONITOR      1    // AHT20 temperature/humidity sensor
 #define ENABLE_BATTERY_MONITOR  1    // Battery voltage monitoring via ADC
 #define ENABLE_SOIL_MONITOR     1    // Soil moisture monitoring via ADC
 
@@ -87,8 +87,8 @@
 // ============================================================================
 
 #define I2C_PORT                     I2C_NUM_0
-#define I2C_SDA_PIN                  GPIO_NUM_6 // Changed from GPIO7
-#define I2C_SCL_PIN                  GPIO_NUM_19 // CRITICAL: GPIO9 is boot strapping pin! Changed to GPIO19    
+#define I2C_SDA_PIN                  GPIO_NUM_19  // matches firebeetle 2 silkscreen
+#define I2C_SCL_PIN                  GPIO_NUM_20  // matches firebeetle 2 silkscreen
 #define I2C_FREQ_HZ                  100000
 
 #define ENV_TASK_STACK_SIZE          (8 * 1024)   // Increased to reduce stack pressure during logging/formatting

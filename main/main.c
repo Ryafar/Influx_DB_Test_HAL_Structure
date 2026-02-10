@@ -30,6 +30,8 @@
 
 #if ENABLE_ENV_MONITOR
 #include "application/env_monitor_app.h"
+
+static env_monitor_app_t env_app;
 #endif
 
 #if ENABLE_SOIL_MONITOR
@@ -142,7 +144,6 @@ static esp_err_t init_sensors(void) {
 
 #if ENABLE_ENV_MONITOR
     ESP_LOGI(TAG, "Initializing Environment Monitor (AHT20)...");
-    static env_monitor_app_t env_app;
     env_monitor_config_t env_config;
     env_monitor_get_default_config(&env_config);
     ret = env_monitor_init(&env_app, &env_config);
@@ -196,6 +197,21 @@ static esp_err_t run_measurement_cycle(void) {
     ret = battery_monitor_wait_for_completion(30000);
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "Battery monitor timeout: %s", esp_err_to_name(ret));
+    }
+#endif
+
+#if ENABLE_ENV_MONITOR
+    ESP_LOGI(TAG, "Starting environment monitor task...");
+    ret = env_monitor_start(&env_app);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start environment monitor: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    // Wait for environment monitoring to complete
+    ret = env_monitor_wait_for_completion(&env_app, 30000);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Environment monitor timeout: %s", esp_err_to_name(ret));
     }
 #endif
 

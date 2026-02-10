@@ -127,55 +127,22 @@ esp_err_t env_monitor_init(env_monitor_app_t* app, const env_monitor_config_t* c
 
     memcpy(&app->config, cfg, sizeof(*cfg));
 
-    // Wi-Fi and Influx setup
-    wifi_manager_config_t wifi_cfg = {
-        .ssid = WIFI_SSID,
-        .password = WIFI_PASSWORD,
-        .max_retry = WIFI_MAX_RETRY,
-    };
-
-    influxdb_client_config_t influx_cfg = {
-        .port = INFLUXDB_PORT,
-        .timeout_ms = HTTP_TIMEOUT_MS,
-        .max_retries = HTTP_MAX_RETRIES,
-    };
-    strncpy(influx_cfg.server, INFLUXDB_SERVER, sizeof(influx_cfg.server) - 1);
-    influx_cfg.server[sizeof(influx_cfg.server) - 1] = '\0';
-    strncpy(influx_cfg.bucket, INFLUXDB_BUCKET, sizeof(influx_cfg.bucket) - 1);
-    influx_cfg.bucket[sizeof(influx_cfg.bucket) - 1] = '\0';
-    strncpy(influx_cfg.org, INFLUXDB_ORG, sizeof(influx_cfg.org) - 1);
-    influx_cfg.org[sizeof(influx_cfg.org) - 1] = '\0';
-    strncpy(influx_cfg.token, INFLUXDB_TOKEN, sizeof(influx_cfg.token) - 1);
-    influx_cfg.token[sizeof(influx_cfg.token) - 1] = '\0';
-    strncpy(influx_cfg.endpoint, INFLUXDB_ENDPOINT, sizeof(influx_cfg.endpoint) - 1);
-    influx_cfg.endpoint[sizeof(influx_cfg.endpoint) - 1] = '\0';
-
-    // Init Wi-Fi
-    wifi_manager_init(&wifi_cfg, NULL);
-    wifi_manager_connect();
-
-    // Wait for Wi-Fi (up to 30s)
-    int wait = 0;
-    while (!wifi_manager_is_connected() && wait < 30) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        wait++;
-        ESP_LOGI(TAG, "WiFi connection attempt %d/30", wait);
-    }
+    // Check if WiFi is already connected (initialized by main)
     if (!wifi_manager_is_connected()) {
-        ESP_LOGE(TAG, "WiFi connection failed");
-        return ESP_FAIL;
+        ESP_LOGW(TAG, "WiFi not connected, waiting for connection...");
+        int wifi_wait_count = 0;
+        while (!wifi_manager_is_connected() && wifi_wait_count < 30) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            wifi_wait_count++;
+        }
+        
+        if (!wifi_manager_is_connected()) {
+            ESP_LOGE(TAG, "WiFi connection timeout");
+            return ESP_ERR_TIMEOUT;
+        }
     }
-
-    // Init Influx client and sender
-    ESP_ERROR_CHECK(influxdb_client_init(&influx_cfg));
-
-    // Proactively test the HTTP/TLS path like the working example does
-    influxdb_response_status_t conn = influxdb_test_connection();
-    if (conn != INFLUXDB_RESPONSE_OK) {
-        ESP_LOGW(TAG, "InfluxDB connection test failed (status=%d), will still attempt to send", conn);
-    }
-
-    influx_sender_init();
+    
+    ESP_LOGI(TAG, "WiFi is connected - using shared WiFi and InfluxDB instances");
 
     // Init sensor
     esp_err_t ret = aht20_init(&s_aht20, cfg->i2c_port, cfg->sda_io, cfg->scl_io, cfg->i2c_clk_hz);
