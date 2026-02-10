@@ -15,6 +15,7 @@
 #include "string.h"
 
 #include "../config/esp32-config.h"
+#include "../config/credentials.h"
 #include "esp_utils.h"
 #include "ntp_time.h"
 #include "wifi_manager.h"

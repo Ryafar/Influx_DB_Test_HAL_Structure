@@ -12,6 +12,9 @@
 #include "driver/gpio.h"
 #include "esp_adc/adc_oneshot.h"
 
+// Note: WiFi/InfluxDB credentials are in credentials.h (git-ignored)
+// Include credentials.h directly in files that need it (wifi_manager, influxdb_client, etc.)
+
 // ============================================================================
 // Feature Toggles - Enable/Disable Monitoring Modules
 // ============================================================================
@@ -129,13 +132,12 @@
 // ============================================================================
 // InfluxDB Configuration
 // ============================================================================
+// Note: INFLUXDB_SERVER, INFLUXDB_BUCKET, INFLUXDB_ORG, and INFLUXDB_TOKEN
+//       are defined in credentials.h (git-ignored)
 
-#define USE_INFLUXDB            1                   // Enable InfluxDB data logging        
-#define INFLUXDB_SERVER         "sensors.robpi.mywire.org"
+#define USE_INFLUXDB            1                   // Enable InfluxDB data logging
 #define INFLUXDB_PORT           443                 // HTTPS port (Caddy reverse proxy)
 #define INFLUXDB_USE_HTTPS      1                   // HTTPS required for Caddy proxy
-#define INFLUXDB_BUCKET         "ESP32Data"
-#define INFLUXDB_ORG            "MyOrg"               // Note: org is case-sensitive and must match InfluxDB exactly
 #define INFLUXDB_ENDPOINT       "/api/v2/write"
 
 // ============================================================================
