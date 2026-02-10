@@ -22,6 +22,7 @@
 #define ENABLE_ENV_MONITOR      1    // AHT20 temperature/humidity sensor
 #define ENABLE_BATTERY_MONITOR  1    // Battery voltage monitoring via ADC
 #define ENABLE_SOIL_MONITOR     1    // Soil moisture monitoring via ADC
+#define ENABLE_EPAPER_DISPLAY   0    // WeAct ePaper display (SPI)
 
 // ============================================================================
 // Deep Sleep Configuration
@@ -67,12 +68,12 @@
 // ============================================================================
 
 #define SOIL_ADC_UNIT               ADC_UNIT_1
-#define SOIL_ADC_CHANNEL            ADC_CHANNEL_1      // GPIO1 (moved from GPIO0)
+#define SOIL_ADC_CHANNEL            ADC_CHANNEL_2      // GPIO2 (changed to avoid ePaper conflict)
 #define SOIL_ADC_BITWIDTH           ADC_BITWIDTH_12
 #define SOIL_ADC_ATTENUATION        ADC_ATTEN_DB_12
 #define SOIL_ADC_VREF               3.3f
 
-#define SOIL_SENSOR_POWER_PIN       GPIO_NUM_2     // GPIO2 controls power to the soil sensor (moved from GPIO9 which is a boot strapping pin)
+#define SOIL_SENSOR_POWER_PIN       GPIO_NUM_18    // GPIO18 (changed to avoid ePaper conflict)
 
 #define SOIL_TASK_STACK_SIZE            (4 * 1024)
 #define SOIL_TASK_PRIORITY              5
@@ -90,6 +91,36 @@
 #define I2C_SDA_PIN                  GPIO_NUM_19  // matches firebeetle 2 silkscreen
 #define I2C_SCL_PIN                  GPIO_NUM_20  // matches firebeetle 2 silkscreen
 #define I2C_FREQ_HZ                  100000
+
+// ============================================================================
+// ePaper Display Configuration (WeAct Studio Module)
+// ============================================================================
+
+#if ENABLE_EPAPER_DISPLAY
+
+// SPI Pin Configuration (WeAct Standard)
+#define EPAPER_SPI_HOST             SPI2_HOST
+#define EPAPER_SPI_MOSI_PIN         GPIO_NUM_6
+#define EPAPER_SPI_SCK_PIN          GPIO_NUM_4
+#define EPAPER_SPI_CS_PIN           GPIO_NUM_7
+#define EPAPER_SPI_DC_PIN           GPIO_NUM_1     // Data/Command
+#define EPAPER_SPI_RST_PIN          GPIO_NUM_5     // Reset
+#define EPAPER_SPI_BUSY_PIN         GPIO_NUM_3     // Busy signal
+#define EPAPER_POWER_PIN            GPIO_NUM_8     // Power control (HIGH = ON)
+
+// Display Model Selection (uncomment one)
+#define EPAPER_MODEL_213_BN         1   // 2.13" B/W 122x250 DEPG0213BN
+//#define EPAPER_MODEL_154_D67        1   // 1.54" B/W 200x200 GDEH0154D67
+//#define EPAPER_MODEL_290_BS         1   // 2.9" B/W 128x296 DEPG0290BS
+//#define EPAPER_MODEL_420_GDEY042T81 1   // 4.2" B/W 400x300
+
+// Display Configuration
+#define EPAPER_ROTATION             1   // 0, 1, 2, 3 (90° increments)
+#define EPAPER_FULL_UPDATE_INTERVAL 10  // Full refresh every N partial updates
+#define EPAPER_TASK_STACK_SIZE      (8 * 1024)
+#define EPAPER_TASK_PRIORITY        4
+
+#endif // ENABLE_EPAPER_DISPLAY
 
 #define ENV_TASK_STACK_SIZE          (8 * 1024)   // Increased to reduce stack pressure during logging/formatting
 #define ENV_TASK_PRIORITY            5
