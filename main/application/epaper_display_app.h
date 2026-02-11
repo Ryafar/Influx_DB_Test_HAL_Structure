@@ -10,7 +10,7 @@
 #define EPAPER_DISPLAY_APP_H
 
 #include "esp_err.h"
-#include "epaper_driver.h"
+#include "epaper/epaper_driver.h"
 #include <stdint.h>
 
 #ifdef __cplusplus

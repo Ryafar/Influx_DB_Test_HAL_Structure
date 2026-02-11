@@ -40,6 +40,12 @@ static env_monitor_app_t env_app;
 static soil_monitor_app_t soil_app;
 #endif
 
+#if ENABLE_EPAPER_DISPLAY
+#include "application/epaper_display_app.h"
+
+static epaper_display_app_t epaper_app;
+#endif
+
 static const char *TAG = "MAIN";
 
 // ============================================================================
@@ -105,7 +111,8 @@ static esp_err_t init_system(void) {
     ESP_ERROR_CHECK(ret);
     ESP_LOGI(TAG, "NVS initialized");
     
-    // Initialize network stack
+#if ENABLE_WIFI
+    // Initialize network stack (only needed for WiFi/InfluxDB)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_LOGI(TAG, "Network stack initialized");
@@ -131,6 +138,9 @@ static esp_err_t init_system(void) {
         ESP_ERROR_CHECK(influx_sender_init());
         ESP_LOGI(TAG, "InfluxDB sender initialized");
     }
+#else
+    ESP_LOGI(TAG, "WiFi disabled - running in offline mode");
+#endif
     
     return ESP_OK;
 }
@@ -168,12 +178,90 @@ static esp_err_t init_sensors(void) {
     ESP_LOGI(TAG, "Soil Monitor initialized");
 #endif
 
-#if !ENABLE_ENV_MONITOR && !ENABLE_BATTERY_MONITOR && !ENABLE_SOIL_MONITOR
-    #error "At least one monitor must be enabled!"
+#if ENABLE_EPAPER_DISPLAY
+    ESP_LOGI(TAG, "Initializing ePaper Display (1.54\" 200x200)...");
+    epaper_display_config_t epaper_config;
+    epaper_display_get_default_config(&epaper_config);
+    
+    ret = epaper_display_init(&epaper_app, &epaper_config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize ePaper display: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    ESP_LOGI(TAG, "ePaper Display initialized");
+#endif
+
+#if !ENABLE_ENV_MONITOR && !ENABLE_BATTERY_MONITOR && !ENABLE_SOIL_MONITOR && !ENABLE_EPAPER_DISPLAY
+    #error "At least one monitor or display must be enabled!"
 #endif
 
     return ESP_OK;
 }
+
+// ============================================================================
+// ePaper Display Test Routine
+// ============================================================================
+
+#if ENABLE_EPAPER_DISPLAY
+static void run_epaper_test_routine(void) {
+    ESP_LOGI(TAG, "======================================");
+    ESP_LOGI(TAG, "Starting ePaper Display Test Routine");
+    ESP_LOGI(TAG, "======================================");
+    
+    // Test 1: Clear display to white
+    ESP_LOGI(TAG, "Test 1: Clearing display (white background)...");
+    epaper_clear(&epaper_app.driver);
+    epaper_update(&epaper_app.driver, true);
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    
+    // Test 2: Display welcome message
+    ESP_LOGI(TAG, "Test 2: Displaying welcome message...");
+    epaper_display_show_message(&epaper_app, "ESP32 Sensor\nMonitor v2.0\n\n1.54\" Display\n200x200 px\n\nInitializing...");
+    epaper_update(&epaper_app.driver, true);
+    vTaskDelay(pdMS_TO_TICKS(3000));
+    
+    // Test 3: Draw some test patterns
+    ESP_LOGI(TAG, "Test 3: Drawing test patterns...");
+    epaper_clear(&epaper_app.driver);
+    
+    // Draw border
+    epaper_draw_line(&epaper_app.driver, 0, 0, 199, 0, EPAPER_COLOR_BLACK);
+    epaper_draw_line(&epaper_app.driver, 199, 0, 199, 199, EPAPER_COLOR_BLACK);
+    epaper_draw_line(&epaper_app.driver, 199, 199, 0, 199, EPAPER_COLOR_BLACK);
+    epaper_draw_line(&epaper_app.driver, 0, 199, 0, 0, EPAPER_COLOR_BLACK);
+    
+    // Draw diagonal lines
+    epaper_draw_line(&epaper_app.driver, 0, 0, 199, 199, EPAPER_COLOR_BLACK);
+    epaper_draw_line(&epaper_app.driver, 199, 0, 0, 199, EPAPER_COLOR_BLACK);
+    
+    // Draw some text
+    epaper_draw_text(&epaper_app.driver, 60, 90, "TEST", 2, EPAPER_ALIGN_LEFT);
+    epaper_draw_text(&epaper_app.driver, 50, 105, "PATTERN", 2, EPAPER_ALIGN_LEFT);
+    
+    epaper_update(&epaper_app.driver, false);
+    vTaskDelay(pdMS_TO_TICKS(3000));
+    
+    // Test 4: Display sample sensor data
+    ESP_LOGI(TAG, "Test 4: Displaying sample sensor data...");
+    float test_temp = 25.5;
+    float test_hum = 65.2;
+    float test_soil = 45.0;
+    float test_batt = 3.7;
+    
+    epaper_display_update_data(&epaper_app, test_temp, test_hum, test_soil, test_batt);
+    epaper_display_refresh(&epaper_app, true);
+    vTaskDelay(pdMS_TO_TICKS(3000));
+    
+    // Test 5: Final message
+    ESP_LOGI(TAG, "Test 5: Display test complete message...");
+    epaper_display_show_message(&epaper_app, "Display Test\nComplete!\n\nAll systems\noperational\n\nReady for\nmonitoring");
+    epaper_update(&epaper_app.driver, false);
+    
+    ESP_LOGI(TAG, "======================================");
+    ESP_LOGI(TAG, "ePaper Display Test Routine Complete");
+    ESP_LOGI(TAG, "======================================\n");
+}
+#endif
 
 // ============================================================================
 // Monitoring Cycle
@@ -241,6 +329,37 @@ static esp_err_t run_measurement_cycle(void) {
         }
     }
     
+#if ENABLE_EPAPER_DISPLAY
+    // Update ePaper display with latest sensor data
+    ESP_LOGI(TAG, "Updating ePaper display...");
+    float temp = 0, hum = 0, soil = 0, batt = 0;
+    
+    #if ENABLE_ENV_MONITOR
+        // Get temperature and humidity from env monitor
+        // (This is simplified - you may need to add getters to env_monitor_app)
+        temp = 25.0;  // Placeholder
+        hum = 60.0;   // Placeholder
+    #endif
+    
+    #if ENABLE_SOIL_MONITOR
+        soil = 50.0;  // Placeholder
+    #endif
+    
+    #if ENABLE_BATTERY_MONITOR
+        batt = 3.7;   // Placeholder
+    #endif
+    
+    ret = epaper_display_update_data(&epaper_app, temp, hum, soil, batt);
+    if (ret == ESP_OK) {
+        ret = epaper_display_refresh(&epaper_app, false);  // Partial update
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Display refresh failed: %s", esp_err_to_name(ret));
+        }
+    } else {
+        ESP_LOGW(TAG, "Display data update failed: %s", esp_err_to_name(ret));
+    }
+#endif
+    
     ESP_LOGI(TAG, "--- Measurement Cycle Complete ---\n");
     return ESP_OK;
 }
@@ -261,6 +380,9 @@ void app_main(void) {
 #endif
 #if ENABLE_SOIL_MONITOR
     ESP_LOGI(TAG, "  - Soil Monitor: ENABLED");
+#endif
+#if ENABLE_EPAPER_DISPLAY
+    ESP_LOGI(TAG, "  - ePaper Display: ENABLED (1.54\", 200x200)");
 #endif
 #if DEEP_SLEEP_ENABLED
     ESP_LOGI(TAG, "  - Deep Sleep: ENABLED (%ds cycles)", DEEP_SLEEP_DURATION_SECONDS);
@@ -291,6 +413,12 @@ void app_main(void) {
     }
     
     ESP_LOGI(TAG, "System ready!\n");
+
+#if ENABLE_EPAPER_DISPLAY
+    // Run ePaper display test routine
+    run_epaper_test_routine();
+    vTaskDelay(pdMS_TO_TICKS(2000));  // Wait before starting main loop
+#endif
 
     // // debug while loop
     // while (1) {

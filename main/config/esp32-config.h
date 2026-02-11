@@ -19,10 +19,11 @@
 // Feature Toggles - Enable/Disable Monitoring Modules
 // ============================================================================
 
-#define ENABLE_ENV_MONITOR      1    // AHT20 temperature/humidity sensor
-#define ENABLE_BATTERY_MONITOR  1    // Battery voltage monitoring via ADC
-#define ENABLE_SOIL_MONITOR     1    // Soil moisture monitoring via ADC
-#define ENABLE_EPAPER_DISPLAY   0    // WeAct ePaper display (SPI)
+#define ENABLE_WIFI             0   // WiFi connectivity (needed for InfluxDB)
+#define ENABLE_ENV_MONITOR      0   // AHT20 temperature/humidity sensor
+#define ENABLE_BATTERY_MONITOR  0   // Battery voltage monitoring via ADC
+#define ENABLE_SOIL_MONITOR     0   // Soil moisture monitoring via ADC
+#define ENABLE_EPAPER_DISPLAY   1   // WeAct ePaper display (SPI)
 
 // ============================================================================
 // Deep Sleep Configuration
@@ -43,7 +44,6 @@
 // Battery Monitor Configuration (if enabled)
 // ============================================================================
 
-#if ENABLE_BATTERY_MONITOR
 
 #define BATTERY_ADC_UNIT                        ADC_UNIT_1
 #define BATTERY_ADC_CHANNEL                     ADC_CHANNEL_0      // GPIO0
@@ -61,7 +61,7 @@
 #define BATTERY_MONITOR_MEASUREMENT_INTERVAL_MS (10 * 1000)
 #define BATTERY_MEASUREMENTS_PER_CYCLE          1
 
-#endif // ENABLE_BATTERY_MONITOR
+
 
 // ============================================================================
 // Soil Monitor Configuration
@@ -103,14 +103,14 @@
 #define EPAPER_SPI_MOSI_PIN         GPIO_NUM_6
 #define EPAPER_SPI_SCK_PIN          GPIO_NUM_4
 #define EPAPER_SPI_CS_PIN           GPIO_NUM_7
-#define EPAPER_SPI_DC_PIN           GPIO_NUM_1     // Data/Command
+#define EPAPER_SPI_DC_PIN           GPIO_NUM_15     // Data/Command
 #define EPAPER_SPI_RST_PIN          GPIO_NUM_5     // Reset
 #define EPAPER_SPI_BUSY_PIN         GPIO_NUM_3     // Busy signal
 #define EPAPER_POWER_PIN            GPIO_NUM_8     // Power control (HIGH = ON)
 
 // Display Model Selection (uncomment one)
-#define EPAPER_MODEL_213_BN         1   // 2.13" B/W 122x250 DEPG0213BN
-//#define EPAPER_MODEL_154_D67        1   // 1.54" B/W 200x200 GDEH0154D67
+//#define EPAPER_MODEL_213_BN         1   // 2.13" B/W 122x250 DEPG0213BN
+#define EPAPER_MODEL_154_D67        1   // 1.54" B/W 200x200 GDEH0154D67
 //#define EPAPER_MODEL_290_BS         1   // 2.9" B/W 128x296 DEPG0290BS
 //#define EPAPER_MODEL_420_GDEY042T81 1   // 4.2" B/W 400x300
 
