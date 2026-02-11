@@ -116,7 +116,7 @@
 
 // Display Configuration
 #define EPAPER_ROTATION             1   // 0, 1, 2, 3 (90° increments)
-#define EPAPER_FULL_UPDATE_INTERVAL 10  // Full refresh every N partial updates
+#define EPAPER_FULL_UPDATE_INTERVAL 10  // Full refresh every N partial updates (partial refresh is faster, ~0.3s vs ~2s)
 #define EPAPER_TASK_STACK_SIZE      (8 * 1024)
 #define EPAPER_TASK_PRIORITY        4
 

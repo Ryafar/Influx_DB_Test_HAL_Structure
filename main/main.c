@@ -15,6 +15,7 @@
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "esp_sleep.h"
+#include "esp_timer.h"
 #include "nvs_flash.h"
 
 #include "config/esp32-config.h"
@@ -212,13 +213,15 @@ static void run_epaper_test_routine(void) {
     ESP_LOGI(TAG, "Test 1: Clearing display (white background)...");
     epaper_clear(&epaper_app.driver);
     epaper_update(&epaper_app.driver, true);
+    ESP_LOGI(TAG, "Waiting for display refresh...");
     vTaskDelay(pdMS_TO_TICKS(2000));
     
     // Test 2: Display welcome message
     ESP_LOGI(TAG, "Test 2: Displaying welcome message...");
     epaper_display_show_message(&epaper_app, "ESP32 Sensor\nMonitor v2.0\n\n1.54\" Display\n200x200 px\n\nInitializing...");
     epaper_update(&epaper_app.driver, true);
-    vTaskDelay(pdMS_TO_TICKS(3000));
+    ESP_LOGI(TAG, "Waiting for display refresh...");
+    vTaskDelay(pdMS_TO_TICKS(2000));
     
     // Test 3: Draw some test patterns
     ESP_LOGI(TAG, "Test 3: Drawing test patterns...");
@@ -238,8 +241,9 @@ static void run_epaper_test_routine(void) {
     epaper_draw_text(&epaper_app.driver, 60, 90, "TEST", 2, EPAPER_ALIGN_LEFT);
     epaper_draw_text(&epaper_app.driver, 50, 105, "PATTERN", 2, EPAPER_ALIGN_LEFT);
     
-    epaper_update(&epaper_app.driver, false);
-    vTaskDelay(pdMS_TO_TICKS(3000));
+    epaper_update(&epaper_app.driver, true);
+    ESP_LOGI(TAG, "Waiting for display refresh...");
+    vTaskDelay(pdMS_TO_TICKS(2000));
     
     // Test 4: Display sample sensor data
     ESP_LOGI(TAG, "Test 4: Displaying sample sensor data...");
@@ -249,19 +253,88 @@ static void run_epaper_test_routine(void) {
     float test_batt = 3.7;
     
     epaper_display_update_data(&epaper_app, test_temp, test_hum, test_soil, test_batt);
-    epaper_display_refresh(&epaper_app, true);
-    vTaskDelay(pdMS_TO_TICKS(3000));
+    ESP_LOGI(TAG, "Waiting for display refresh...");
+    vTaskDelay(pdMS_TO_TICKS(2000));
     
     // Test 5: Final message
     ESP_LOGI(TAG, "Test 5: Display test complete message...");
     epaper_display_show_message(&epaper_app, "Display Test\nComplete!\n\nAll systems\noperational\n\nReady for\nmonitoring");
-    epaper_update(&epaper_app.driver, false);
+    epaper_update(&epaper_app.driver, true);
+    ESP_LOGI(TAG, "Waiting for display refresh...");
+    vTaskDelay(pdMS_TO_TICKS(2000));
     
     ESP_LOGI(TAG, "======================================");
     ESP_LOGI(TAG, "ePaper Display Test Routine Complete");
     ESP_LOGI(TAG, "======================================\n");
 }
-#endif
+
+// ============================================================================
+// ePaper Partial Refresh Demo
+// ============================================================================
+
+static void run_partial_refresh_demo(void) {
+    ESP_LOGI(TAG, "======================================");
+    ESP_LOGI(TAG, "Partial Refresh Demo - Watch the Speed!");
+    ESP_LOGI(TAG, "======================================");
+    
+    // Start with base values and do a full refresh
+    float temp = 20.0;
+    float hum = 50.0;
+    float soil = 30.0;
+    float batt = 4.2;
+    
+    ESP_LOGI(TAG, "Demo 1: Initial full refresh...");
+    epaper_display_update_data(&epaper_app, temp, hum, soil, batt);
+    vTaskDelay(pdMS_TO_TICKS(5000));
+    
+    // Now do 12 partial refreshes with changing values
+    ESP_LOGI(TAG, "Demo 2: Watch 12 updates (first 10 partial, then full refresh)...");
+    ESP_LOGI(TAG, "Notice: Partial updates are MUCH faster (~0.3s vs ~2s)!");
+    
+    for (int i = 1; i <= 12; i++) {
+        // Simulate sensor values changing slightly
+        temp += 2.0;    // Temperature rising
+        hum -= 3.0;     // Humidity dropping
+        soil += 5.0;    // Soil moisture increasing
+        batt -= 0.05;   // Battery draining slowly
+        
+        ESP_LOGI(TAG, "Update %d: T=%.1f°C H=%.1f%% S=%.1f%% B=%.2fV", 
+                 i, temp, hum, soil, batt);
+        
+        uint32_t start_time = esp_timer_get_time() / 1000;
+        epaper_display_update_data(&epaper_app, temp, hum, soil, batt);
+        uint32_t duration = (esp_timer_get_time() / 1000) - start_time;
+        
+        ESP_LOGI(TAG, "Update took %lu ms", duration);
+        
+        if (i == 10) {
+            ESP_LOGI(TAG, ">>> Next update will be FULL REFRESH (watch the difference!)");
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(2000));  // 2 seconds between updates
+    }
+    
+    ESP_LOGI(TAG, "\nDemo 3: Force full refresh to clear any ghosting...");
+    epaper_update(&epaper_app.driver, true);  // Force full refresh
+    vTaskDelay(pdMS_TO_TICKS(3000));
+    
+    ESP_LOGI(TAG, "Demo 4: Rapid partial updates (10 in a row)...");
+    for (int i = 0; i < 10; i++) {
+        temp += 1.0;
+        epaper_display_update_data(&epaper_app, temp, hum, soil, batt);
+        ESP_LOGI(TAG, "Rapid update %d complete - Temperature now %.1f°C", i+1, temp);
+        vTaskDelay(pdMS_TO_TICKS(800));  // 800ms between updates
+    }
+    
+    ESP_LOGI(TAG, "\n======================================");
+    ESP_LOGI(TAG, "Partial Refresh Demo Complete!");
+    ESP_LOGI(TAG, "Summary:");
+    ESP_LOGI(TAG, "- Partial refresh: ~300ms (fast, slight ghosting)");
+    ESP_LOGI(TAG, "- Full refresh: ~2000ms (slow, no ghosting)");
+    ESP_LOGI(TAG, "- Auto full refresh every 10 updates prevents ghosting");
+    ESP_LOGI(TAG, "======================================\n");
+}
+#endif  // ENABLE_EPAPER_DISPLAY
 
 // ============================================================================
 // Monitoring Cycle
@@ -349,14 +422,10 @@ static esp_err_t run_measurement_cycle(void) {
         batt = 3.7;   // Placeholder
     #endif
     
+    // epaper_display_update_data already calls epaper_update internally
     ret = epaper_display_update_data(&epaper_app, temp, hum, soil, batt);
-    if (ret == ESP_OK) {
-        ret = epaper_display_refresh(&epaper_app, false);  // Partial update
-        if (ret != ESP_OK) {
-            ESP_LOGW(TAG, "Display refresh failed: %s", esp_err_to_name(ret));
-        }
-    } else {
-        ESP_LOGW(TAG, "Display data update failed: %s", esp_err_to_name(ret));
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Display update failed: %s", esp_err_to_name(ret));
     }
 #endif
     
@@ -417,7 +486,11 @@ void app_main(void) {
 #if ENABLE_EPAPER_DISPLAY
     // Run ePaper display test routine
     run_epaper_test_routine();
-    vTaskDelay(pdMS_TO_TICKS(2000));  // Wait before starting main loop
+    vTaskDelay(pdMS_TO_TICKS(2000));  // Wait before starting partial refresh demo
+    
+    // Run partial refresh demonstration
+    run_partial_refresh_demo();
+    vTaskDelay(pdMS_TO_TICKS(2000));  // Wait before main loop
 #endif
 
     // // debug while loop

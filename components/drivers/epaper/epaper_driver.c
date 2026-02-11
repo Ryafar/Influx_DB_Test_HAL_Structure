@@ -276,6 +276,61 @@ static esp_err_t epaper_init_213bn(epaper_driver_t* driver) {
 }
 
 /**
+ * @brief Initialize 1.54" GDEH0154D67 display (SSD1681 controller)
+ */
+static esp_err_t epaper_init_154d67(epaper_driver_t* driver) {
+    ESP_LOGI(TAG, "Initializing 1.54\" GDEH0154D67 (SSD1681)");
+    
+    epaper_hw_reset(driver);
+    epaper_wait_idle(driver, 2000);
+    
+    // Software reset
+    epaper_send_command(driver, 0x12);
+    vTaskDelay(pdMS_TO_TICKS(10));
+    epaper_wait_idle(driver, 2000);
+    
+    // Driver output control (200 lines)
+    epaper_send_command(driver, 0x01);
+    epaper_send_data(driver, 0xC7);  // Height - 1 (200-1 = 199 = 0xC7)
+    epaper_send_data(driver, 0x00);
+    epaper_send_data(driver, 0x00);
+    
+    // Data entry mode setting
+    epaper_send_command(driver, 0x11);
+    epaper_send_data(driver, 0x03);  // X increment, Y increment (normal orientation)
+    
+    // Set RAM X address start/end
+    epaper_send_command(driver, 0x44);
+    epaper_send_data(driver, 0x00);  // Start at 0
+    epaper_send_data(driver, 0x18);  // End at 24 (200/8 = 25, but 0-indexed)
+    
+    // Set RAM Y address start/end
+    epaper_send_command(driver, 0x45);
+    epaper_send_data(driver, 0x00);  // Start Y = 0
+    epaper_send_data(driver, 0x00);
+    epaper_send_data(driver, 0xC7);  // End Y = 199
+    epaper_send_data(driver, 0x00);
+    
+    // Border waveform control
+    epaper_send_command(driver, 0x3C);
+    epaper_send_data(driver, 0x01);  // VBD - LUT1 (white border)
+    
+    // Temperature sensor control
+    epaper_send_command(driver, 0x18);
+    epaper_send_data(driver, 0x80);  // Internal temperature sensor
+    
+    // Display update control
+    epaper_send_command(driver, 0x22);
+    epaper_send_data(driver, 0xB1);  // Load LUT with display mode 1
+    epaper_send_command(driver, 0x20);  // Master activation
+    
+    epaper_wait_idle(driver, 2000);
+    
+    ESP_LOGI(TAG, "1.54\" display initialized");
+    return ESP_OK;
+}
+
+/**
  * @brief Initialize display based on model
  */
 static esp_err_t epaper_init_display_controller(epaper_driver_t* driver) {
@@ -284,6 +339,8 @@ static esp_err_t epaper_init_display_controller(epaper_driver_t* driver) {
             return epaper_init_213bn(driver);
             
         case EPAPER_MODEL_154_200x200:
+            return epaper_init_154d67(driver);
+            
         case EPAPER_MODEL_290_128x296:
         case EPAPER_MODEL_420_400x300:
             ESP_LOGW(TAG, "Display model not yet implemented, using stub");
@@ -719,6 +776,46 @@ esp_err_t epaper_update(epaper_driver_t* driver, bool force_full) {
         
         // Wait for update to complete
         vTaskDelay(pdMS_TO_TICKS(10));
+        epaper_wait_idle(driver, 5000);
+        
+        ESP_LOGI(TAG, "Display update complete");
+    } else if (driver->config.model == EPAPER_MODEL_154_200x200) {
+        // Implementation for 1.54" SSD1681 (supports partial refresh with dual buffers)
+        // Re-initialize RAM address pointers before each update
+        epaper_send_command(driver, 0x4E);
+        epaper_send_data(driver, 0x00);
+        
+        // Set RAM Y address counter  
+        epaper_send_command(driver, 0x4F);
+        epaper_send_data(driver, 0x00);  // Start from 0
+        epaper_send_data(driver, 0x00);
+        
+        if (do_full_update) {
+            // Full refresh: write to both RAM buffers (0x24 and 0x26)
+            // Buffer 0x24 - new data
+            epaper_send_command(driver, 0x24);
+            epaper_send_data_buffer(driver, driver->framebuffer, driver->fb_size);
+            
+            // Buffer 0x26 - old data (same as new for full refresh)
+            epaper_send_command(driver, 0x26);
+            epaper_send_data_buffer(driver, driver->framebuffer, driver->fb_size);
+            
+            // Full update mode
+            epaper_send_command(driver, 0x22);
+            epaper_send_data(driver, 0xF7);  // Full update sequence
+        } else {
+            // Partial refresh: only update 0x24 buffer
+            epaper_send_command(driver, 0x24);
+            epaper_send_data_buffer(driver, driver->framebuffer, driver->fb_size);
+            
+            // Partial update mode
+            epaper_send_command(driver, 0x22);
+            epaper_send_data(driver, 0xFF);  // Partial update sequence
+        }
+        
+        epaper_send_command(driver, 0x20);  // Master Activation
+        
+        // Wait for update to complete (BUSY pin goes low when done)
         epaper_wait_idle(driver, 5000);
         
         ESP_LOGI(TAG, "Display update complete");

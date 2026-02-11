@@ -135,6 +135,7 @@ esp_err_t epaper_display_update_data(epaper_display_app_t* app,
     }
     
     // Clear framebuffer (set all to white)
+    ESP_LOGI(TAG, "Clearing framebuffer...");
     epaper_clear(&app->driver);
     
     char buffer[64];
@@ -142,6 +143,7 @@ esp_err_t epaper_display_update_data(epaper_display_app_t* app,
     const uint16_t line_height = 20;
     
     // Draw header
+    ESP_LOGI(TAG, "Drawing header...");
     if (app->config.show_timestamp) {
         epaper_draw_text(&app->driver, app->driver.config.width / 2, y_pos, 
                          "Sensor Data", 2, EPAPER_ALIGN_CENTER);
@@ -152,12 +154,14 @@ esp_err_t epaper_display_update_data(epaper_display_app_t* app,
     y_pos += line_height * 2;
     
     // Draw separator line
+    ESP_LOGI(TAG, "Drawing separator at y=%d", y_pos);
     epaper_draw_line(&app->driver, 10, y_pos, app->driver.config.width - 10, y_pos, EPAPER_COLOR_BLACK);
     y_pos += 10;
     
     // Temperature
     if (app->config.show_temperature) {
         snprintf(buffer, sizeof(buffer), "Temp: %.1f C", temperature);
+        ESP_LOGI(TAG, "Drawing: %s at y=%d", buffer, y_pos);
         epaper_draw_text(&app->driver, 10, y_pos, buffer, 1, EPAPER_ALIGN_LEFT);
         y_pos += line_height;
     }
@@ -165,6 +169,7 @@ esp_err_t epaper_display_update_data(epaper_display_app_t* app,
     // Humidity
     if (app->config.show_humidity) {
         snprintf(buffer, sizeof(buffer), "Humidity: %.1f %%", humidity);
+        ESP_LOGI(TAG, "Drawing: %s at y=%d", buffer, y_pos);
         epaper_draw_text(&app->driver, 10, y_pos, buffer, 1, EPAPER_ALIGN_LEFT);
         y_pos += line_height;
     }
@@ -172,6 +177,7 @@ esp_err_t epaper_display_update_data(epaper_display_app_t* app,
     // Soil Moisture
     if (app->config.show_soil) {
         snprintf(buffer, sizeof(buffer), "Soil: %.1f %%", soil_moisture);
+        ESP_LOGI(TAG, "Drawing: %s at y=%d", buffer, y_pos);
         epaper_draw_text(&app->driver, 10, y_pos, buffer, 1, EPAPER_ALIGN_LEFT);
         y_pos += line_height;
     }
@@ -179,10 +185,12 @@ esp_err_t epaper_display_update_data(epaper_display_app_t* app,
     // Battery Voltage
     if (app->config.show_battery) {
         snprintf(buffer, sizeof(buffer), "Battery: %.2f V", battery_voltage);
+        ESP_LOGI(TAG, "Drawing: %s at y=%d", buffer, y_pos);
         epaper_draw_text(&app->driver, 10, y_pos, buffer, 1, EPAPER_ALIGN_LEFT);
         y_pos += line_height;
         
         // Draw battery indicator rectangle (simple visual)
+        ESP_LOGI(TAG, "Drawing battery indicator at y=%d", y_pos);
         uint16_t battery_bar_width = (uint16_t)((battery_voltage - 3.0) / (4.2 - 3.0) * 80);
         if (battery_bar_width > 80) battery_bar_width = 80;
         if (battery_bar_width > 0) {
@@ -192,9 +200,13 @@ esp_err_t epaper_display_update_data(epaper_display_app_t* app,
     }
     
     // Update display (will auto-select full/partial based on counter)
-    esp_err_t ret = epaper_update(&app->driver, false);
+    ESP_LOGI(TAG, "Sending framebuffer to display...");
+    esp_err_t ret = epaper_update(&app->driver, false);  // Let driver decide full vs partial
     if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Display updated successfully");
         app->last_update_time = esp_timer_get_time() / 1000; // Convert to ms
+    } else {
+        ESP_LOGE(TAG, "Display update failed: %s", esp_err_to_name(ret));
     }
     
     return ret;
