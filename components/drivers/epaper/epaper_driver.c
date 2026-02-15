@@ -260,11 +260,6 @@ static esp_err_t epaper_init_213bn(epaper_driver_t* driver) {
     epaper_send_command(driver, 0x3C);
     epaper_send_data(driver, 0x05);
     
-    // Display update control
-    epaper_send_command(driver, 0x21);
-    epaper_send_data(driver, 0x00);
-    epaper_send_data(driver, 0x80);  // WeActStudio uses 0x80 here
-    
     // Temperature sensor control
     epaper_send_command(driver, 0x18);
     epaper_send_data(driver, 0x80);  // Internal temperature sensor
@@ -798,7 +793,7 @@ esp_err_t epaper_update(epaper_driver_t* driver, bool force_full) {
         epaper_send_data(driver, 0x00);  // Y start = 0 low byte
         epaper_send_data(driver, 0x00);  // Y start high byte
         
-        // Write to 0x26 buffer first (used as "previous" for differential refresh)
+        // Write to 0x26 buffer (same data as 0x24 per WeActStudio)
         epaper_send_command(driver, 0x26);
         epaper_send_data_buffer(driver, driver->framebuffer, driver->fb_size);
         
@@ -815,12 +810,12 @@ esp_err_t epaper_update(epaper_driver_t* driver, bool force_full) {
         
         // Update display
         epaper_send_command(driver, 0x22);  // Display Update Control 2
-        epaper_send_data(driver, do_full_update ? 0xF7 : 0xFF);  // Full or partial
+        epaper_send_data(driver, 0xF7);  // Full update (per WeActStudio)
         epaper_send_command(driver, 0x20);  // Master Activation (Update display)
         
         // Wait for update to complete
-        vTaskDelay(pdMS_TO_TICKS(10));
-        epaper_wait_idle(driver, 5000);
+        vTaskDelay(pdMS_TO_TICKS(100));
+        epaper_wait_idle(driver, 10000);
         
         ESP_LOGI(TAG, "Display update complete");
     } else if (driver->config.model == EPAPER_MODEL_154_200x200) {

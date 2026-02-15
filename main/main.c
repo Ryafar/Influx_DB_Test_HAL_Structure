@@ -209,51 +209,29 @@ static void run_epaper_test_routine(void) {
     ESP_LOGI(TAG, "Starting Simple ePaper Test");
     ESP_LOGI(TAG, "======================================");
     
-    // Test 1: Clear display (should be all white)
-    ESP_LOGI(TAG, "Test 1: Clearing to white...");
+    // Initial display: Write some text and wait
+    ESP_LOGI(TAG, "Writing initial text...");
     epaper_clear(&epaper_app.driver);
+    epaper_draw_text(&epaper_app.driver, 10, 20, "ESP32-C6", 2, EPAPER_ALIGN_LEFT);
+    epaper_draw_text(&epaper_app.driver, 10, 50, "E-Paper Test", 2, EPAPER_ALIGN_LEFT);
+    epaper_draw_text(&epaper_app.driver, 10, 80, "Wait 20s...", 1, EPAPER_ALIGN_LEFT);
     epaper_update(&epaper_app.driver, true);
-    vTaskDelay(pdMS_TO_TICKS(3000));
     
-    // Test 2: Simple text at different positions
-    ESP_LOGI(TAG, "Test 2: Drawing simple text...");
-    epaper_clear(&epaper_app.driver);
-    epaper_draw_text(&epaper_app.driver, 10, 10, "Hello ESP32!", 1, EPAPER_ALIGN_LEFT);
-    epaper_draw_text(&epaper_app.driver, 10, 30, "2.13\" Display", 1, EPAPER_ALIGN_LEFT);
-    epaper_draw_text(&epaper_app.driver, 10, 50, "250x122 pixels", 1, EPAPER_ALIGN_LEFT);
-    epaper_update(&epaper_app.driver, true);
-    vTaskDelay(pdMS_TO_TICKS(3000));
+    // Wait 20 seconds
+    ESP_LOGI(TAG, "Waiting 20 seconds...");
+    vTaskDelay(pdMS_TO_TICKS(20000));
     
-    // Test 3: Larger text
-    ESP_LOGI(TAG, "Test 3: Larger text...");
+    // Update display with new content
+    ESP_LOGI(TAG, "Updating display...");
     epaper_clear(&epaper_app.driver);
-    epaper_draw_text(&epaper_app.driver, 10, 20, "BIG TEXT", 2, EPAPER_ALIGN_LEFT);
-    epaper_draw_text(&epaper_app.driver, 10, 50, "Size 2", 2, EPAPER_ALIGN_LEFT);
-    epaper_update(&epaper_app.driver, true);
-    vTaskDelay(pdMS_TO_TICKS(3000));
-    
-    // Test 4: Draw border rectangle
-    ESP_LOGI(TAG, "Test 4: Border rectangle...");
-    epaper_clear(&epaper_app.driver);
+    epaper_draw_text(&epaper_app.driver, 10, 10, "UPDATED!", 3, EPAPER_ALIGN_LEFT);
+    epaper_draw_text(&epaper_app.driver, 10, 60, "Display works!", 1, EPAPER_ALIGN_LEFT);
+    epaper_draw_text(&epaper_app.driver, 10, 80, "2.13\" DEPG0213BN", 1, EPAPER_ALIGN_LEFT);
     epaper_draw_rect(&epaper_app.driver, 5, 5, 240, 112, EPAPER_COLOR_BLACK, false);
-    epaper_draw_text(&epaper_app.driver, 125, 56, "BORDER", 2, EPAPER_ALIGN_CENTER);
     epaper_update(&epaper_app.driver, true);
-    vTaskDelay(pdMS_TO_TICKS(3000));
-    
-    // Test 5: Draw diagonal lines
-    ESP_LOGI(TAG, "Test 5: Drawing diagonal lines...");
-    epaper_clear(&epaper_app.driver);
-    epaper_draw_text(&epaper_app.driver, 10, 10, "DIAGONAL LINES", 1, EPAPER_ALIGN_LEFT);
-    // Draw some diagonal lines
-    for (int i = 0; i < 50; i += 10) {
-        epaper_draw_line(&epaper_app.driver, 10 + i, 40, 60 + i, 40, EPAPER_COLOR_BLACK);
-    }
-    epaper_draw_text(&epaper_app.driver, 10, 60, "BLACK LINES ABOVE", 1, EPAPER_ALIGN_LEFT);
-    epaper_update(&epaper_app.driver, true);
-    vTaskDelay(pdMS_TO_TICKS(3000));
     
     ESP_LOGI(TAG, "======================================");
-    ESP_LOGI(TAG, "Simple Test Complete");
+    ESP_LOGI(TAG, "Test Complete");
     ESP_LOGI(TAG, "======================================\n");
 }
 

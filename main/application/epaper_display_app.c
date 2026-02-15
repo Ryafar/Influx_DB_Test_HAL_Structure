@@ -139,64 +139,59 @@ esp_err_t epaper_display_update_data(epaper_display_app_t* app,
     epaper_clear(&app->driver);
     
     char buffer[64];
-    uint16_t y_pos = 10;
-    const uint16_t line_height = 20;
+    uint16_t y_pos = 5;
+    const uint16_t line_height = 14;  // Compact spacing for narrow display
     
-    // Draw header
+    // Draw compact header
     ESP_LOGI(TAG, "Drawing header...");
-    if (app->config.show_timestamp) {
-        epaper_draw_text(&app->driver, app->driver.config.width / 2, y_pos, 
-                         "Sensor Data", 2, EPAPER_ALIGN_CENTER);
-    } else {
-        epaper_draw_text(&app->driver, app->driver.config.width / 2, y_pos, 
-                         "Sensors", 2, EPAPER_ALIGN_CENTER);
-    }
-    y_pos += line_height * 2;
+    epaper_draw_text(&app->driver, app->driver.config.width / 2, y_pos, 
+                     "Sensor Data", 1, EPAPER_ALIGN_CENTER);
+    y_pos += 12;
     
     // Draw separator line
     ESP_LOGI(TAG, "Drawing separator at y=%d", y_pos);
     epaper_draw_line(&app->driver, 10, y_pos, app->driver.config.width - 10, y_pos, EPAPER_COLOR_BLACK);
-    y_pos += 10;
+    y_pos += 8;
     
-    // Temperature
+    // Temperature - very compact format for narrow display
     if (app->config.show_temperature) {
-        snprintf(buffer, sizeof(buffer), "Temp: %.1f C", temperature);
+        snprintf(buffer, sizeof(buffer), "T:%.1fC", temperature);
         ESP_LOGI(TAG, "Drawing: %s at y=%d", buffer, y_pos);
         epaper_draw_text(&app->driver, 10, y_pos, buffer, 1, EPAPER_ALIGN_LEFT);
         y_pos += line_height;
     }
     
-    // Humidity
+    // Humidity - very compact format
     if (app->config.show_humidity) {
-        snprintf(buffer, sizeof(buffer), "Humidity: %.1f %%", humidity);
+        snprintf(buffer, sizeof(buffer), "H:%.0f%%", humidity);
         ESP_LOGI(TAG, "Drawing: %s at y=%d", buffer, y_pos);
         epaper_draw_text(&app->driver, 10, y_pos, buffer, 1, EPAPER_ALIGN_LEFT);
         y_pos += line_height;
     }
     
-    // Soil Moisture
+    // Soil Moisture - very compact format
     if (app->config.show_soil) {
-        snprintf(buffer, sizeof(buffer), "Soil: %.1f %%", soil_moisture);
+        snprintf(buffer, sizeof(buffer), "S:%.0f%%", soil_moisture);
         ESP_LOGI(TAG, "Drawing: %s at y=%d", buffer, y_pos);
         epaper_draw_text(&app->driver, 10, y_pos, buffer, 1, EPAPER_ALIGN_LEFT);
         y_pos += line_height;
     }
     
-    // Battery Voltage
+    // Battery Voltage - very compact format with bar
     if (app->config.show_battery) {
-        snprintf(buffer, sizeof(buffer), "Battery: %.2f V", battery_voltage);
+        snprintf(buffer, sizeof(buffer), "B:%.2fV", battery_voltage);
         ESP_LOGI(TAG, "Drawing: %s at y=%d", buffer, y_pos);
         epaper_draw_text(&app->driver, 10, y_pos, buffer, 1, EPAPER_ALIGN_LEFT);
         y_pos += line_height;
         
-        // Draw battery indicator rectangle (simple visual)
+        // Draw battery indicator bar (full width for 122px display)
         ESP_LOGI(TAG, "Drawing battery indicator at y=%d", y_pos);
-        uint16_t battery_bar_width = (uint16_t)((battery_voltage - 3.0) / (4.2 - 3.0) * 80);
-        if (battery_bar_width > 80) battery_bar_width = 80;
+        uint16_t battery_bar_width = (uint16_t)((battery_voltage - 3.0) / (4.2 - 3.0) * 102);
+        if (battery_bar_width > 102) battery_bar_width = 102;
         if (battery_bar_width > 0) {
             epaper_draw_rect(&app->driver, 10, y_pos, battery_bar_width, 8, EPAPER_COLOR_BLACK, true);
         }
-        epaper_draw_rect(&app->driver, 10, y_pos, 80, 8, EPAPER_COLOR_BLACK, false);
+        epaper_draw_rect(&app->driver, 10, y_pos, 102, 8, EPAPER_COLOR_BLACK, false);
     }
     
     // Update display (will auto-select full/partial based on counter)
