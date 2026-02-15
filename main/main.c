@@ -206,65 +206,54 @@ static esp_err_t init_sensors(void) {
 #if ENABLE_EPAPER_DISPLAY
 static void run_epaper_test_routine(void) {
     ESP_LOGI(TAG, "======================================");
-    ESP_LOGI(TAG, "Starting ePaper Display Test Routine");
+    ESP_LOGI(TAG, "Starting Simple ePaper Test");
     ESP_LOGI(TAG, "======================================");
     
-    // Test 1: Clear display to white
-    ESP_LOGI(TAG, "Test 1: Clearing display (white background)...");
+    // Test 1: Clear display (should be all white)
+    ESP_LOGI(TAG, "Test 1: Clearing to white...");
     epaper_clear(&epaper_app.driver);
     epaper_update(&epaper_app.driver, true);
-    ESP_LOGI(TAG, "Waiting for display refresh...");
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    vTaskDelay(pdMS_TO_TICKS(3000));
     
-    // Test 2: Display welcome message
-    ESP_LOGI(TAG, "Test 2: Displaying welcome message...");
-    epaper_display_show_message(&epaper_app, "ESP32 Sensor\nMonitor v2.0\n\n1.54\" Display\n200x200 px\n\nInitializing...");
-    epaper_update(&epaper_app.driver, true);
-    ESP_LOGI(TAG, "Waiting for display refresh...");
-    vTaskDelay(pdMS_TO_TICKS(2000));
-    
-    // Test 3: Draw some test patterns
-    ESP_LOGI(TAG, "Test 3: Drawing test patterns...");
+    // Test 2: Simple text at different positions
+    ESP_LOGI(TAG, "Test 2: Drawing simple text...");
     epaper_clear(&epaper_app.driver);
-    
-    // Draw border
-    epaper_draw_line(&epaper_app.driver, 0, 0, 199, 0, EPAPER_COLOR_BLACK);
-    epaper_draw_line(&epaper_app.driver, 199, 0, 199, 199, EPAPER_COLOR_BLACK);
-    epaper_draw_line(&epaper_app.driver, 199, 199, 0, 199, EPAPER_COLOR_BLACK);
-    epaper_draw_line(&epaper_app.driver, 0, 199, 0, 0, EPAPER_COLOR_BLACK);
-    
-    // Draw diagonal lines
-    epaper_draw_line(&epaper_app.driver, 0, 0, 199, 199, EPAPER_COLOR_BLACK);
-    epaper_draw_line(&epaper_app.driver, 199, 0, 0, 199, EPAPER_COLOR_BLACK);
-    
-    // Draw some text
-    epaper_draw_text(&epaper_app.driver, 60, 90, "TEST", 2, EPAPER_ALIGN_LEFT);
-    epaper_draw_text(&epaper_app.driver, 50, 105, "PATTERN", 2, EPAPER_ALIGN_LEFT);
-    
+    epaper_draw_text(&epaper_app.driver, 10, 10, "Hello ESP32!", 1, EPAPER_ALIGN_LEFT);
+    epaper_draw_text(&epaper_app.driver, 10, 30, "2.13\" Display", 1, EPAPER_ALIGN_LEFT);
+    epaper_draw_text(&epaper_app.driver, 10, 50, "250x122 pixels", 1, EPAPER_ALIGN_LEFT);
     epaper_update(&epaper_app.driver, true);
-    ESP_LOGI(TAG, "Waiting for display refresh...");
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    vTaskDelay(pdMS_TO_TICKS(3000));
     
-    // Test 4: Display sample sensor data
-    ESP_LOGI(TAG, "Test 4: Displaying sample sensor data...");
-    float test_temp = 25.5;
-    float test_hum = 65.2;
-    float test_soil = 45.0;
-    float test_batt = 3.7;
-    
-    epaper_display_update_data(&epaper_app, test_temp, test_hum, test_soil, test_batt);
-    ESP_LOGI(TAG, "Waiting for display refresh...");
-    vTaskDelay(pdMS_TO_TICKS(2000));
-    
-    // Test 5: Final message
-    ESP_LOGI(TAG, "Test 5: Display test complete message...");
-    epaper_display_show_message(&epaper_app, "Display Test\nComplete!\n\nAll systems\noperational\n\nReady for\nmonitoring");
+    // Test 3: Larger text
+    ESP_LOGI(TAG, "Test 3: Larger text...");
+    epaper_clear(&epaper_app.driver);
+    epaper_draw_text(&epaper_app.driver, 10, 20, "BIG TEXT", 2, EPAPER_ALIGN_LEFT);
+    epaper_draw_text(&epaper_app.driver, 10, 50, "Size 2", 2, EPAPER_ALIGN_LEFT);
     epaper_update(&epaper_app.driver, true);
-    ESP_LOGI(TAG, "Waiting for display refresh...");
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    vTaskDelay(pdMS_TO_TICKS(3000));
+    
+    // Test 4: Draw border rectangle
+    ESP_LOGI(TAG, "Test 4: Border rectangle...");
+    epaper_clear(&epaper_app.driver);
+    epaper_draw_rect(&epaper_app.driver, 5, 5, 240, 112, EPAPER_COLOR_BLACK, false);
+    epaper_draw_text(&epaper_app.driver, 125, 56, "BORDER", 2, EPAPER_ALIGN_CENTER);
+    epaper_update(&epaper_app.driver, true);
+    vTaskDelay(pdMS_TO_TICKS(3000));
+    
+    // Test 5: Draw diagonal lines
+    ESP_LOGI(TAG, "Test 5: Drawing diagonal lines...");
+    epaper_clear(&epaper_app.driver);
+    epaper_draw_text(&epaper_app.driver, 10, 10, "DIAGONAL LINES", 1, EPAPER_ALIGN_LEFT);
+    // Draw some diagonal lines
+    for (int i = 0; i < 50; i += 10) {
+        epaper_draw_line(&epaper_app.driver, 10 + i, 40, 60 + i, 40, EPAPER_COLOR_BLACK);
+    }
+    epaper_draw_text(&epaper_app.driver, 10, 60, "BLACK LINES ABOVE", 1, EPAPER_ALIGN_LEFT);
+    epaper_update(&epaper_app.driver, true);
+    vTaskDelay(pdMS_TO_TICKS(3000));
     
     ESP_LOGI(TAG, "======================================");
-    ESP_LOGI(TAG, "ePaper Display Test Routine Complete");
+    ESP_LOGI(TAG, "Simple Test Complete");
     ESP_LOGI(TAG, "======================================\n");
 }
 
@@ -484,13 +473,12 @@ void app_main(void) {
     ESP_LOGI(TAG, "System ready!\n");
 
 #if ENABLE_EPAPER_DISPLAY
-    // Run ePaper display test routine
+    // Run simple ePaper display test
     run_epaper_test_routine();
-    vTaskDelay(pdMS_TO_TICKS(2000));  // Wait before starting partial refresh demo
     
-    // Run partial refresh demonstration
-    run_partial_refresh_demo();
-    vTaskDelay(pdMS_TO_TICKS(2000));  // Wait before main loop
+    // Uncomment to run partial refresh demo:
+    // vTaskDelay(pdMS_TO_TICKS(2000));
+    // run_partial_refresh_demo();
 #endif
 
     // // debug while loop

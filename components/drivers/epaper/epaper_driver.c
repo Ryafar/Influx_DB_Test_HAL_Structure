@@ -125,7 +125,7 @@ typedef struct {
 
 static const epaper_spec_t display_specs[] = {
     [EPAPER_MODEL_154_200x200] = {200, 200, "1.54\" GDEH0154D67"},
-    [EPAPER_MODEL_213_122x250] = {122, 250, "2.13\" DEPG0213BN"},
+    [EPAPER_MODEL_213_122x250] = {122, 250, "2.13\" DEPG0213BN"},  // 122 wide x 250 tall (rotated orientation)
     [EPAPER_MODEL_290_128x296] = {128, 296, "2.9\" DEPG0290BS"},
     [EPAPER_MODEL_420_400x300] = {400, 300, "4.2\" GDEY042T81"},
 };
@@ -236,25 +236,25 @@ static esp_err_t epaper_init_213bn(epaper_driver_t* driver) {
     
     // Driver output control
     epaper_send_command(driver, 0x01);
-    epaper_send_data(driver, 0xF9);  // Height - 1 (250-1 = 249 = 0xF9)
-    epaper_send_data(driver, 0x00);
+    epaper_send_data(driver, 0x27);  // (296-1) low byte = 0x127 -> Height-1 for 250 tall display
+    epaper_send_data(driver, 0x01);  // (296-1) high byte
     epaper_send_data(driver, 0x00);
     
-    // Data entry mode
+    // Data entry mode setting
     epaper_send_command(driver, 0x11);
-    epaper_send_data(driver, 0x03);  // X increment, Y increment
+    epaper_send_data(driver, 0x03);  // Y increment, X increment - fixes upside-down text
     
-    // Set RAM X address start/end
+    // Set RAM X address start/end  
     epaper_send_command(driver, 0x44);
     epaper_send_data(driver, 0x00);  // Start at 0
-    epaper_send_data(driver, 0x0F);  // End at 15 (122/8 = 15.25)
+    epaper_send_data(driver, 0x0F);  // End at 15 (16 bytes = 128 pixels, covers 122 width)
     
-    // Set RAM Y address start/end
+    // Set RAM Y address start/end (normal order for Y increment mode)
     epaper_send_command(driver, 0x45);
-    epaper_send_data(driver, 0x00);  // Start Y = 0
-    epaper_send_data(driver, 0x00);
-    epaper_send_data(driver, 0xF9);  // End Y = 249
-    epaper_send_data(driver, 0x00);
+    epaper_send_data(driver, 0x00);  // Start Y = 0 low byte
+    epaper_send_data(driver, 0x00);  // Start Y high byte
+    epaper_send_data(driver, 0x27);  // End Y = 0x127 (295) low byte
+    epaper_send_data(driver, 0x01);  // End Y high byte
     
     // Border waveform control
     epaper_send_command(driver, 0x3C);
@@ -263,7 +263,7 @@ static esp_err_t epaper_init_213bn(epaper_driver_t* driver) {
     // Display update control
     epaper_send_command(driver, 0x21);
     epaper_send_data(driver, 0x00);
-    epaper_send_data(driver, 0x80);
+    epaper_send_data(driver, 0x80);  // WeActStudio uses 0x80 here
     
     // Temperature sensor control
     epaper_send_command(driver, 0x18);
@@ -388,8 +388,14 @@ esp_err_t epaper_init(epaper_driver_t* driver, const epaper_config_t* config) {
     // Copy configuration
     memcpy(&driver->config, config, sizeof(epaper_config_t));
     
-    // Calculate framebuffer size (1 bit per pixel)
-    driver->fb_size = (config->width * config->height + 7) / 8;
+    // Calculate framebuffer size - must be padded to full bytes per row
+    // Each row needs ceil(width/8) bytes, then multiply by height
+    uint32_t bytes_per_row = (config->width + 7) / 8;
+    driver->fb_size = bytes_per_row * config->height;
+    
+    ESP_LOGI(TAG, "Framebuffer: %ux%u pixels, %lu bytes per row, %lu bytes total",
+             config->width, config->height, bytes_per_row, driver->fb_size);
+    
     driver->framebuffer = (uint8_t*)malloc(driver->fb_size);
     if (driver->framebuffer == NULL) {
         ESP_LOGE(TAG, "Failed to allocate framebuffer (%lu bytes)", driver->fb_size);
@@ -577,8 +583,11 @@ esp_err_t epaper_fill(epaper_driver_t* driver, uint8_t color) {
         return ESP_ERR_INVALID_STATE;
     }
     
-    uint8_t fill_byte = color ? 0x00 : 0xFF;
-    memset(driver->framebuffer, fill_byte, driver->fb_size);
+    if (color == EPAPER_COLOR_BLACK) {
+        memset(driver->framebuffer, 0x00, driver->fb_size);  // 0x00 = black
+    } else {
+        memset(driver->framebuffer, 0xFF, driver->fb_size);  // 0xFF = white
+    }
     
     return ESP_OK;
 }
@@ -588,19 +597,43 @@ esp_err_t epaper_draw_pixel(epaper_driver_t* driver, uint16_t x, uint16_t y, epa
         return ESP_ERR_INVALID_STATE;
     }
     
-    if (x >= driver->config.width || y >= driver->config.height) {
+    // Apply rotation transformation
+    uint16_t rotated_x = x;
+    uint16_t rotated_y = y;
+    
+    switch (driver->config.rotation) {
+        case 0:  // No rotation
+            rotated_x = x;
+            rotated_y = y;
+            break;
+        case 1:  // 90° clockwise
+            rotated_x = driver->config.height - 1 - y;
+            rotated_y = x;
+            break;
+        case 2:  // 180° rotation (WeActStudio EPD_ROTATE_180)
+            rotated_x = driver->config.width - 1 - x;
+            rotated_y = driver->config.height - 1 - y;
+            break;
+        case 3:  // 270° clockwise (90° counter-clockwise)
+            rotated_x = y;
+            rotated_y = driver->config.width - 1 - x;
+            break;
+    }
+    
+    if (rotated_x >= driver->config.width || rotated_y >= driver->config.height) {
         return ESP_ERR_INVALID_ARG;
     }
     
     // Calculate byte position and bit position
-    // Display is organized as 1 bit per pixel, 8 pixels per byte
-    uint32_t byte_index = (y * driver->config.width + x) / 8;
-    uint8_t bit_position = 7 - (x % 8);
+    // Each row is padded to full bytes, so we need bytes_per_row
+    uint32_t bytes_per_row = (driver->config.width + 7) / 8;
+    uint32_t byte_index = rotated_y * bytes_per_row + (rotated_x / 8);
+    uint8_t bit_position = 7 - (rotated_x % 8);
     
-    if (color == EPAPER_COLOR_WHITE) {
-        driver->framebuffer[byte_index] |= (1 << bit_position);
+    if (color == EPAPER_COLOR_BLACK) {
+        driver->framebuffer[byte_index] &= ~(1 << bit_position);  // 0 = black
     } else {
-        driver->framebuffer[byte_index] &= ~(1 << bit_position);
+        driver->framebuffer[byte_index] |= (1 << bit_position);   // 1 = white
     }
     
     return ESP_OK;
@@ -756,17 +789,28 @@ esp_err_t epaper_update(epaper_driver_t* driver, bool force_full) {
     
     // Implementation for 2.13" SSD1680
     if (driver->config.model == EPAPER_MODEL_213_122x250) {
-        // Set RAM X address counter
+        // Set RAM X address counter to start
         epaper_send_command(driver, 0x4E);
         epaper_send_data(driver, 0x00);
         
-        // Set RAM Y address counter
+        // Set RAM Y address counter to start (0x0000 in Y-increment mode)
         epaper_send_command(driver, 0x4F);
-        epaper_send_data(driver, 0x00);
-        epaper_send_data(driver, 0x00);
+        epaper_send_data(driver, 0x00);  // Y start = 0 low byte
+        epaper_send_data(driver, 0x00);  // Y start high byte
         
-        // Write framebuffer to RAM
-        epaper_send_command(driver, 0x24);  // Write RAM (Black/White)
+        // Write to 0x26 buffer first (used as "previous" for differential refresh)
+        epaper_send_command(driver, 0x26);
+        epaper_send_data_buffer(driver, driver->framebuffer, driver->fb_size);
+        
+        // Reset RAM address pointers to start again
+        epaper_send_command(driver, 0x4E);
+        epaper_send_data(driver, 0x00);
+        epaper_send_command(driver, 0x4F);
+        epaper_send_data(driver, 0x00);  // Y start = 0 low byte
+        epaper_send_data(driver, 0x00);  // Y start high byte
+        
+        // Write to 0x24 buffer (current display data)
+        epaper_send_command(driver, 0x24);
         epaper_send_data_buffer(driver, driver->framebuffer, driver->fb_size);
         
         // Update display

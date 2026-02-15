@@ -62,7 +62,7 @@ typedef struct {
 typedef struct {
     epaper_config_t config;
     spi_device_handle_t spi;
-    uint8_t* framebuffer;
+    uint8_t* framebuffer;         // Black/White buffer
     uint32_t fb_size;
     bool is_initialized;
     bool is_powered;

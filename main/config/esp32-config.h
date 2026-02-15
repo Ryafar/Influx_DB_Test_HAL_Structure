@@ -109,13 +109,13 @@
 #define EPAPER_POWER_PIN            GPIO_NUM_8     // Power control (HIGH = ON)
 
 // Display Model Selection (uncomment one)
-//#define EPAPER_MODEL_213_BN         1   // 2.13" B/W 122x250 DEPG0213BN
-#define EPAPER_MODEL_154_D67        1   // 1.54" B/W 200x200 GDEH0154D67
+#define EPAPER_MODEL_213_BN         1   // 2.13" B&R 122x250 DEPG0213BN (Black & Red support)
+//#define EPAPER_MODEL_154_D67        1   // 1.54" B/W 200x200 GDEH0154D67
 //#define EPAPER_MODEL_290_BS         1   // 2.9" B/W 128x296 DEPG0290BS
 //#define EPAPER_MODEL_420_GDEY042T81 1   // 4.2" B/W 400x300
 
 // Display Configuration
-#define EPAPER_ROTATION             1   // 0, 1, 2, 3 (90° increments)
+#define EPAPER_ROTATION             0   // 0=normal (Y-decrement mode handles physical orientation)
 #define EPAPER_FULL_UPDATE_INTERVAL 10  // Full refresh every N partial updates (partial refresh is faster, ~0.3s vs ~2s)
 #define EPAPER_TASK_STACK_SIZE      (8 * 1024)
 #define EPAPER_TASK_PRIORITY        4
