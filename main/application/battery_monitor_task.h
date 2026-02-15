@@ -22,5 +22,6 @@ esp_err_t battery_monitor_start(uint32_t measurements_per_cycle);
 esp_err_t battery_monitor_stop();
 esp_err_t battery_monitor_wait_for_completion(uint32_t timeout_ms);
 void battery_monitor_task(void* pvParameters);
+esp_err_t battery_monitor_get_last_voltage(float* voltage);
 
 #endif // BATTERY_MONITOR_TASK_H

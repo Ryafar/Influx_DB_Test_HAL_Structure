@@ -6,8 +6,7 @@ A power-efficient ESP32-C6 application that monitors temperature and humidity us
 
 - 🌡️ **AHT20 Temperature & Humidity Sensing** via I2C
 - � **Battery Voltage Monitoring** with ADC calibration and voltage divider support
-- 🌱 **Soil Moisture Monitoring** with capacitive sensor and power management
-- 📡 **WiFi Connectivity** with automatic reconnection
+- 🌱 **Soil Moisture Monitoring** with capacitive sensor and power management- 📺 **E-Paper Display** (2.13" DEPG0213BN, 122x250 pixels) with SSD1680 controller- 📡 **WiFi Connectivity** with automatic reconnection
 - 📊 **InfluxDB Integration** for time-series data storage (HTTPS support)
 - ⚡ **Deep Sleep Power Management** for battery operation
 - 🔄 **Configurable Wake Cycles** and measurement intervals
@@ -19,25 +18,35 @@ A power-efficient ESP32-C6 application that monitors temperature and humidity us
 
 ## Hardware Requirements
 
-- **ESP32-C6** development board
+- **ESP32-C6** development board (e.g., DFRobot FireBeetle 2 ESP32-C6)
 - **AHT20** temperature/humidity sensor (optional, enabled via config)
 - **Capacitive Soil Moisture Sensor** (optional, enabled via config)
 - **Battery voltage divider** (optional, enabled via config)
+- **2.13" E-Paper Display** - DEPG0213BN (WeAct Studio, 122x250, black/white, optional)
 
 ### Pin Connections
 
 **I2C (AHT20):**
-  - SDA: GPIO7
-  - SCL: GPIO9
+  - SDA: GPIO19
+  - SCL: GPIO20
   - Power: 3.3V
   - Ground: GND
 
 **ADC Sensors:**
   - Battery Voltage: GPIO0 (ADC1 Channel 0) with 2:1 voltage divider
-  - Soil Moisture: GPIO1 (ADC1 Channel 1)
-  - Soil Power Control: GPIO2 (powers sensor on/off)
+  - Soil Moisture: GPIO2 (ADC1 Channel 2)
+  - Soil Power Control: GPIO18 (powers sensor on/off)
 
-**Note:** GPIO0 is a strapping pin on ESP32-C6 and may have a slight voltage offset (~1V) even when grounded. Consider using a non-strapping pin (GPIO2, GPIO3, etc.) for critical voltage measurements if needed.
+**E-Paper Display (SPI):**
+  - MOSI: GPIO6
+  - SCK: GPIO4
+  - CS: GPIO7
+  - DC (Data/Command): GPIO15
+  - RST (Reset): GPIO5
+  - BUSY: GPIO3
+  - Power Control: GPIO8 (HIGH = ON)
+
+**Note:** GPIO0 is a strapping pin on ESP32-C6 and may have a slight voltage offset (~1V) even when grounded. The current configuration uses GPIO0 for battery monitoring (non-critical) and GPIO2/GPIO18 for soil sensing to avoid conflicts with e-paper SPI pins.
 
 ## Project Structure
 
@@ -52,6 +61,7 @@ A power-efficient ESP32-C6 application that monitors temperature and humidity us
 │       ├── env_monitor_app.c/h         # Environment monitoring task (AHT20)
 │       ├── battery_monitor_task.c/h    # Battery voltage monitoring (toggle in config)
 │       ├── soil_monitor_app.c/h        # Soil moisture monitoring (toggle in config)
+│       ├── epaper_display_app.c/h      # E-paper display application (sensor data UI)
 │       └── influx_sender.c/h           # Async InfluxDB sender with queue
 │
 ├── components/
@@ -59,6 +69,7 @@ A power-efficient ESP32-C6 application that monitors temperature and humidity us
 │   │   ├── sensors/aht20/              # AHT20 I2C driver
 │   │   ├── csm_v2_driver/              # Capacitive soil moisture sensor driver
 │   │   ├── adc/                        # Shared ADC manager (multi-channel support)
+│   │   ├── epaper/                     # E-paper display driver (SSD1680, SPI)
 │   │   ├── wifi/wifi_manager/          # WiFi connection management
 │   │   ├── http/http_client/           # HTTP client wrapper
 │   │   └── influxdb/influxdb_client/   # InfluxDB Line Protocol formatter
@@ -151,9 +162,11 @@ At the top of `esp32-config.h`, toggle features on/off:
 // Feature Toggles - Enable/Disable Monitoring Modules
 // ============================================================================
 
+#define ENABLE_WIFI             1    // WiFi connectivity (needed for InfluxDB)
 #define ENABLE_ENV_MONITOR      1    // AHT20 temperature/humidity sensor
-#define ENABLE_BATTERY_MONITOR  0    // Battery voltage monitoring via ADC
-#define ENABLE_SOIL_MONITOR     0    // Soil moisture monitoring via ADC
+#define ENABLE_BATTERY_MONITOR  1    // Battery voltage monitoring via ADC
+#define ENABLE_SOIL_MONITOR     1    // Soil moisture monitoring via ADC
+#define ENABLE_EPAPER_DISPLAY   1    // WeAct ePaper display (SPI)
 ```
 
 **That's it!** Set to `1` to enable, `0` to disable. No menuconfig needed.
@@ -179,9 +192,9 @@ Each enabled feature has its own configuration block in the same file:
 **Soil Monitor (when `ENABLE_SOIL_MONITOR = 1`):**
 ```c
 #define SOIL_ADC_UNIT               ADC_UNIT_1
-#define SOIL_ADC_CHANNEL            ADC_CHANNEL_1      // GPIO1 on ESP32-C6
+#define SOIL_ADC_CHANNEL            ADC_CHANNEL_2      // GPIO2 on ESP32-C6
 #define SOIL_ADC_ATTENUATION        ADC_ATTEN_DB_12    // 0-3.3V range
-#define SOIL_SENSOR_POWER_PIN       GPIO_NUM_19        // Power control (on/off)
+#define SOIL_SENSOR_POWER_PIN       GPIO_NUM_18        // Power control (on/off)
 #define SOIL_DRY_VOLTAGE_DEFAULT    3.0f               // Calibration: dry soil
 #define SOIL_WET_VOLTAGE_DEFAULT    1.0f               // Calibration: wet soil
 ```
@@ -191,11 +204,25 @@ Each enabled feature has its own configuration block in the same file:
 - Same eFuse calibration and multisampling as battery monitor
 - Automatic moisture percentage calculation from voltage
 
-**Environment Monitor (always on):**
+**Environment Monitor:**
 ```c
-#define I2C_SDA_PIN              GPIO_NUM_7
-#define I2C_SCL_PIN              GPIO_NUM_9
+#define I2C_SDA_PIN              GPIO_NUM_19
+#define I2C_SCL_PIN              GPIO_NUM_20
 #define I2C_FREQ_HZ              100000
+```
+
+**E-Paper Display (when `ENABLE_EPAPER_DISPLAY = 1`):**
+```c
+#define EPAPER_SPI_HOST          SPI2_HOST
+#define EPAPER_SPI_MOSI_PIN      GPIO_NUM_6
+#define EPAPER_SPI_SCK_PIN       GPIO_NUM_4
+#define EPAPER_SPI_CS_PIN        GPIO_NUM_7
+#define EPAPER_SPI_DC_PIN        GPIO_NUM_15     // Data/Command
+#define EPAPER_SPI_RST_PIN       GPIO_NUM_5      // Reset
+#define EPAPER_SPI_BUSY_PIN      GPIO_NUM_3      // Busy signal
+#define EPAPER_POWER_PIN         GPIO_NUM_8      // Power control
+#define EPAPER_MODEL_213_BN      1               // 2.13" 122x250 B/W
+#define EPAPER_ROTATION          0               // Display orientation
 ```
 
 **WiFi & InfluxDB:**

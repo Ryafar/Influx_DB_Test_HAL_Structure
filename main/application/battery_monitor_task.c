@@ -28,6 +28,9 @@ static TaskHandle_t monitoring_task_handle = NULL;
 
 // Configuration for measurement cycles
 static uint32_t measurements_per_cycle = 0;  // 0 = infinite loop
+
+// Last measured voltage
+static float last_voltage = 0.0f;
 static volatile bool is_running = false;
 
 /**
@@ -55,8 +58,12 @@ static influxdb_response_status_t battery_send_reading_to_influxdb(float voltage
     strncpy(influx_data.device_id, device_id, sizeof(influx_data.device_id) - 1);
     influx_data.device_id[sizeof(influx_data.device_id) - 1] = '\0';
 
+#if USE_INFLUXDB
     influx_sender_init();
     return influx_sender_enqueue_battery(&influx_data);
+#else
+    return ESP_OK;  // Data logged, but not sent (WiFi disabled)
+#endif
 }
 
 esp_err_t battery_monitor_init() {
@@ -236,6 +243,9 @@ void battery_monitor_task(void *pvParameters) {
     while (is_running) {
         float battery_voltage = 0;
         battery_monitor_read_voltage(&battery_voltage);
+        
+        // Store last reading
+        last_voltage = battery_voltage;
 
         // Log the reading
         ESP_LOGI(TAG, "Battery Voltage: %.2f V", battery_voltage);
@@ -283,4 +293,12 @@ void battery_monitor_task(void *pvParameters) {
     is_running = false;
     monitoring_task_handle = NULL;
     vTaskDelete(NULL);
+}
+
+esp_err_t battery_monitor_get_last_voltage(float* voltage) {
+    if (!voltage) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    *voltage = last_voltage;
+    return ESP_OK;
 }

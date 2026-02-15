@@ -47,9 +47,13 @@ static influxdb_response_status_t soil_send_reading_to_influxdb(const csm_v2_rea
     strncpy(influx_data.device_id, device_id, sizeof(influx_data.device_id) - 1);
     influx_data.device_id[sizeof(influx_data.device_id) - 1] = '\0';
 
+#if USE_INFLUXDB
     // Route via sender task to avoid stack pressure in this task
     influx_sender_init();
     return influx_sender_enqueue_soil(&influx_data);
+#else
+    return ESP_OK;  // Data logged, but not sent (WiFi disabled)
+#endif
 }
 
 /**
@@ -85,6 +89,10 @@ static void soil_monitoring_task(void* pvParameters) {
         }
 
         if (ret == ESP_OK) {
+            // Store last reading
+            app->last_voltage = reading.voltage;
+            app->last_moisture_percent = reading.moisture_percent;
+            
             if (app->config.enable_logging) {
                 ESP_LOGI(TAG, "Soil Moisture: %.1f%% | Voltage: %.3fV | Raw ADC: %d",
                          reading.moisture_percent, reading.voltage, reading.raw_adc);
@@ -102,10 +110,10 @@ static void soil_monitoring_task(void* pvParameters) {
                     ESP_LOGW(TAG, "Failed to send soil data to InfluxDB (status: %d)", influx_status);
                 }
             }
+#endif
         } else {
             ESP_LOGE(TAG, "Failed to read sensor: %s", esp_err_to_name(ret));
         }
-#endif
         
         measurement_count++;
         
@@ -119,9 +127,9 @@ static void soil_monitoring_task(void* pvParameters) {
     }
 
     // Ensure sensor is powered off before exiting
-    esp_err_t ret = csm_v2_disable_power(&app->sensor_driver);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to power off sensor: %s", esp_err_to_name(ret));
+    esp_err_t final_ret = csm_v2_disable_power(&app->sensor_driver);
+    if (final_ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to power off sensor: %s", esp_err_to_name(final_ret));
     } else {
         ESP_LOGI(TAG, "CSM V2 Sensor powered off successfully");
     }
@@ -176,6 +184,7 @@ esp_err_t soil_monitor_init(soil_monitor_app_t* app, const soil_monitor_config_t
         return ret;
     }
     
+#if ENABLE_WIFI
     // Check if WiFi is already connected (initialized by main)
     if (!wifi_manager_is_connected()) {
         ESP_LOGW(TAG, "WiFi not connected, waiting for connection...");
@@ -192,6 +201,9 @@ esp_err_t soil_monitor_init(soil_monitor_app_t* app, const soil_monitor_config_t
     }
     
     ESP_LOGI(TAG, "WiFi is connected - using shared WiFi and InfluxDB instances");
+#else
+    ESP_LOGI(TAG, "WiFi disabled - sensor will run in offline mode");
+#endif
     
     // Heavy operations moved to task above to avoid main stack overflow
 
@@ -376,5 +388,14 @@ esp_err_t soil_monitor_calibrate(soil_monitor_app_t* app) {
     app->config.wet_calibration_voltage = wet_voltage;
     
     ESP_LOGI(TAG, "Calibration completed successfully!");
+    return ESP_OK;
+}
+
+esp_err_t soil_monitor_get_last_reading(soil_monitor_app_t* app, float* voltage, float* moisture_percent) {
+    if (!app || !voltage || !moisture_percent) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    *voltage = app->last_voltage;
+    *moisture_percent = app->last_moisture_percent;
     return ESP_OK;
 }

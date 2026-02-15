@@ -376,17 +376,16 @@ static esp_err_t run_measurement_cycle(void) {
     
     #if ENABLE_ENV_MONITOR
         // Get temperature and humidity from env monitor
-        // (This is simplified - you may need to add getters to env_monitor_app)
-        temp = 25.0;  // Placeholder
-        hum = 60.0;   // Placeholder
+        env_monitor_get_last_reading(&env_app, &temp, &hum);
     #endif
     
     #if ENABLE_SOIL_MONITOR
-        soil = 50.0;  // Placeholder
+        float soil_voltage = 0;
+        soil_monitor_get_last_reading(&soil_app, &soil_voltage, &soil);
     #endif
     
     #if ENABLE_BATTERY_MONITOR
-        batt = 3.7;   // Placeholder
+        battery_monitor_get_last_voltage(&batt);
     #endif
     
     // epaper_display_update_data already calls epaper_update internally
@@ -451,8 +450,8 @@ void app_main(void) {
     ESP_LOGI(TAG, "System ready!\n");
 
 #if ENABLE_EPAPER_DISPLAY
-    // Run simple ePaper display test
-    run_epaper_test_routine();
+    // Run simple ePaper display test (disabled for normal sensor operation)
+    // run_epaper_test_routine();
     
     // Uncomment to run partial refresh demo:
     // vTaskDelay(pdMS_TO_TICKS(2000));

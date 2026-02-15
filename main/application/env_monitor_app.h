@@ -40,6 +40,8 @@ typedef struct {
 typedef struct {
     env_monitor_config_t config;
     bool is_running;
+    float last_temperature;
+    float last_humidity;
 } env_monitor_app_t;
 
 void env_monitor_get_default_config(env_monitor_config_t* cfg);
@@ -53,6 +55,8 @@ esp_err_t env_monitor_wait_for_completion(env_monitor_app_t* app, uint32_t timeo
 esp_err_t env_monitor_stop(env_monitor_app_t* app);
 
 esp_err_t env_monitor_deinit(env_monitor_app_t* app);
+
+esp_err_t env_monitor_get_last_reading(env_monitor_app_t* app, float* temperature, float* humidity);
 
 #ifdef __cplusplus
 }

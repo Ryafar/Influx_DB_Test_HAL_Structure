@@ -85,10 +85,9 @@ esp_err_t epaper_display_init(epaper_display_app_t* app, const epaper_display_co
         return ret;
     }
     
-    // Show initial welcome screen
+    // Just clear framebuffer in memory, don't update display yet
+    // First sensor data update will initialize display properly
     epaper_clear(&app->driver);
-    epaper_display_show_message(app, "ESP32 Sensor\nMonitor v2.0\n\nInitializing...");
-    epaper_update(&app->driver, true);
     
     app->is_running = true;
     app->last_update_time = 0;

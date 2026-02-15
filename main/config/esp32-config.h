@@ -20,17 +20,17 @@
 // ============================================================================
 
 #define ENABLE_WIFI             0   // WiFi connectivity (needed for InfluxDB)
-#define ENABLE_ENV_MONITOR      0   // AHT20 temperature/humidity sensor
-#define ENABLE_BATTERY_MONITOR  0   // Battery voltage monitoring via ADC
-#define ENABLE_SOIL_MONITOR     0   // Soil moisture monitoring via ADC
+#define ENABLE_ENV_MONITOR      1   // AHT20 temperature/humidity sensor
+#define ENABLE_BATTERY_MONITOR  1   // Battery voltage monitoring via ADC
+#define ENABLE_SOIL_MONITOR     1   // Soil moisture monitoring via ADC
 #define ENABLE_EPAPER_DISPLAY   1   // WeAct ePaper display (SPI)
 
 // ============================================================================
 // Deep Sleep Configuration
 // ============================================================================
 
-#define DEEP_SLEEP_ENABLED              0                   // Enable/disable deep sleep mode (0 = continuous loop with delay)
-#define DEEP_SLEEP_DURATION_SECONDS     10                  // Sleep duration between measurement cycles
+#define DEEP_SLEEP_ENABLED              1                   // Enable/disable deep sleep mode (0 = continuous loop with delay)
+#define DEEP_SLEEP_DURATION_SECONDS     60                  // Sleep duration between measurement cycles (60s for e-paper refresh interval)
 #define DEEP_SLEEP_WAKEUP_DELAY_MS      100                 // Delay before entering deep sleep
 
 // ============================================================================
@@ -166,7 +166,7 @@
 // Note: INFLUXDB_SERVER, INFLUXDB_BUCKET, INFLUXDB_ORG, and INFLUXDB_TOKEN
 //       are defined in credentials.h (git-ignored)
 
-#define USE_INFLUXDB            1                   // Enable InfluxDB data logging
+#define USE_INFLUXDB            (ENABLE_WIFI && 1)  // Enable InfluxDB data logging (requires WiFi)
 #define INFLUXDB_PORT           443                 // HTTPS port (Caddy reverse proxy)
 #define INFLUXDB_USE_HTTPS      1                   // HTTPS required for Caddy proxy
 #define INFLUXDB_ENDPOINT       "/api/v2/write"

@@ -37,6 +37,8 @@ typedef struct {
     csm_v2_driver_t sensor_driver;      ///< Soil sensor driver
     soil_monitor_config_t config;       ///< Application configuration
     bool is_running;                    ///< Application running status
+    float last_voltage;                 ///< Last measured voltage
+    float last_moisture_percent;        ///< Last measured moisture percentage
 } soil_monitor_app_t;
 
 /**
@@ -78,6 +80,16 @@ esp_err_t soil_monitor_start(soil_monitor_app_t* app);
  * @return esp_err_t ESP_OK if completed, ESP_ERR_TIMEOUT if timed out
  */
 esp_err_t soil_monitor_wait_for_completion(soil_monitor_app_t* app, uint32_t timeout_ms);
+
+/**
+ * @brief Get last measured soil moisture reading
+ * 
+ * @param app Pointer to application handle
+ * @param voltage Pointer to store voltage value
+ * @param moisture_percent Pointer to store moisture percentage
+ * @return esp_err_t ESP_OK on success, error code otherwise
+ */
+esp_err_t soil_monitor_get_last_reading(soil_monitor_app_t* app, float* voltage, float* moisture_percent);
 
 /**
  * @brief Stop the soil monitoring application

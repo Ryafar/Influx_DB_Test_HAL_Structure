@@ -47,8 +47,12 @@ static influxdb_response_status_t send_env_to_influx(float temperature_c, float 
     strncpy(data.device_id, device_id, sizeof(data.device_id) - 1);
     data.device_id[sizeof(data.device_id) - 1] = '\0';
 
+#if USE_INFLUXDB
     influx_sender_init();
     return influx_sender_enqueue_env(&data);
+#else
+    return ESP_OK;  // Data logged, but not sent (WiFi disabled)
+#endif
 }
 
 static void env_monitor_task(void* pv)
@@ -65,6 +69,10 @@ static void env_monitor_task(void* pv)
         float t = 0.0f, h = 0.0f;
         esp_err_t ret = aht20_read(&s_aht20, &t, &h);
         if (ret == ESP_OK) {
+            // Store last reading
+            app->last_temperature = t;
+            app->last_humidity = h;
+            
             if (app->config.enable_logging) {
                 ESP_LOGI(TAG, "AHT20: T=%.2f C, RH=%.2f%%", t, h);
                 // Extra serial output for quick testing
@@ -127,6 +135,7 @@ esp_err_t env_monitor_init(env_monitor_app_t* app, const env_monitor_config_t* c
 
     memcpy(&app->config, cfg, sizeof(*cfg));
 
+#if ENABLE_WIFI
     // Check if WiFi is already connected (initialized by main)
     if (!wifi_manager_is_connected()) {
         ESP_LOGW(TAG, "WiFi not connected, waiting for connection...");
@@ -143,6 +152,9 @@ esp_err_t env_monitor_init(env_monitor_app_t* app, const env_monitor_config_t* c
     }
     
     ESP_LOGI(TAG, "WiFi is connected - using shared WiFi and InfluxDB instances");
+#else
+    ESP_LOGI(TAG, "WiFi disabled - sensor will run in offline mode");
+#endif
 
     // Init sensor
     esp_err_t ret = aht20_init(&s_aht20, cfg->i2c_port, cfg->sda_io, cfg->scl_io, cfg->i2c_clk_hz);
@@ -152,6 +164,8 @@ esp_err_t env_monitor_init(env_monitor_app_t* app, const env_monitor_config_t* c
     }
 
     app->is_running = false;
+    app->last_temperature = 0.0f;
+    app->last_humidity = 0.0f;
     ESP_LOGI(TAG, "Environment monitoring initialized. Device ID: %s, sleep=%ds, measurements_per_cycle=%lu", app->config.device_id, CONFIG_ENV_SLEEP_SECONDS, (unsigned long)app->config.measurements_per_cycle);
     return ESP_OK;
 }
@@ -220,5 +234,14 @@ esp_err_t env_monitor_deinit(env_monitor_app_t* app)
     // Deinit NTP
     ntp_time_deinit();
 
+    return ESP_OK;
+}
+
+esp_err_t env_monitor_get_last_reading(env_monitor_app_t* app, float* temperature, float* humidity) {
+    if (!app || !temperature || !humidity) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    *temperature = app->last_temperature;
+    *humidity = app->last_humidity;
     return ESP_OK;
 }
