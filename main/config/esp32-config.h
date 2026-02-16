@@ -19,9 +19,9 @@
 // Feature Toggles - Enable/Disable Monitoring Modules
 // ============================================================================
 
-#define ENABLE_WIFI             0   // WiFi connectivity (needed for InfluxDB)
+#define ENABLE_WIFI             1   // WiFi connectivity (needed for InfluxDB)
 #define ENABLE_ENV_MONITOR      1   // AHT20 temperature/humidity sensor
-#define ENABLE_BATTERY_MONITOR  1   // Battery voltage monitoring via ADC
+#define ENABLE_BATTERY_MONITOR  1   // Battery voltage monitoring via ADC, Battery connected to GPIO0 with 2:1 voltage divider
 #define ENABLE_SOIL_MONITOR     1   // Soil moisture monitoring via ADC
 #define ENABLE_EPAPER_DISPLAY   1   // WeAct ePaper display (SPI)
 
