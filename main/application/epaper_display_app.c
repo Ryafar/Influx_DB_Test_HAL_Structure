@@ -8,6 +8,8 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include <string.h>
+#include <time.h>
+#include <sys/time.h>
 
 static const char* TAG = "EPAPER_APP";
 
@@ -139,59 +141,110 @@ esp_err_t epaper_display_update_data(epaper_display_app_t* app,
     
     char buffer[64];
     uint16_t y_pos = 5;
-    const uint16_t line_height = 14;  // Compact spacing for narrow display
+    const uint16_t line_height = 18;  // Increased spacing for larger text
     
     // Draw compact header
     ESP_LOGI(TAG, "Drawing header...");
     epaper_draw_text(&app->driver, app->driver.config.width / 2, y_pos, 
-                     "Sensor Data", 1, EPAPER_ALIGN_CENTER);
-    y_pos += 12;
+                     "Sensor \n  Data", 2, EPAPER_ALIGN_CENTER);
+    y_pos += 18 * 2;
     
     // Draw separator line
     ESP_LOGI(TAG, "Drawing separator at y=%d", y_pos);
-    epaper_draw_line(&app->driver, 10, y_pos, app->driver.config.width - 10, y_pos, EPAPER_COLOR_BLACK);
-    y_pos += 8;
+    epaper_draw_line(&app->driver, 5, y_pos, app->driver.config.width - 5, y_pos, EPAPER_COLOR_BLACK);
+    y_pos += 10;
     
-    // Temperature - very compact format for narrow display
+    // Temperature - larger text size
     if (app->config.show_temperature) {
         snprintf(buffer, sizeof(buffer), "T:%.1fC", temperature);
         ESP_LOGI(TAG, "Drawing: %s at y=%d", buffer, y_pos);
-        epaper_draw_text(&app->driver, 10, y_pos, buffer, 1, EPAPER_ALIGN_LEFT);
+        epaper_draw_text(&app->driver, 10, y_pos, buffer, 2, EPAPER_ALIGN_LEFT);
         y_pos += line_height;
     }
     
-    // Humidity - very compact format
+    // Humidity - larger text size
     if (app->config.show_humidity) {
         snprintf(buffer, sizeof(buffer), "H:%.0f%%", humidity);
         ESP_LOGI(TAG, "Drawing: %s at y=%d", buffer, y_pos);
-        epaper_draw_text(&app->driver, 10, y_pos, buffer, 1, EPAPER_ALIGN_LEFT);
+        epaper_draw_text(&app->driver, 10, y_pos, buffer, 2, EPAPER_ALIGN_LEFT);
         y_pos += line_height;
     }
     
-    // Soil Moisture - very compact format
+    // Separator line after temp/humidity
+    ESP_LOGI(TAG, "Drawing separator at y=%d", y_pos);
+    epaper_draw_line(&app->driver, 5, y_pos, app->driver.config.width - 5, y_pos, EPAPER_COLOR_BLACK);
+    y_pos += 10;
+    
+    // Soil Moisture - larger text with percentage bar
     if (app->config.show_soil) {
         snprintf(buffer, sizeof(buffer), "S:%.0f%%", soil_moisture);
         ESP_LOGI(TAG, "Drawing: %s at y=%d", buffer, y_pos);
-        epaper_draw_text(&app->driver, 10, y_pos, buffer, 1, EPAPER_ALIGN_LEFT);
+        epaper_draw_text(&app->driver, 10, y_pos, buffer, 2, EPAPER_ALIGN_LEFT);
         y_pos += line_height;
+        
+        // Draw soil moisture indicator bar
+        ESP_LOGI(TAG, "Drawing soil indicator at y=%d", y_pos);
+        uint16_t soil_bar_width = (uint16_t)(soil_moisture / 100.0 * 102);
+        if (soil_bar_width > 102) soil_bar_width = 102;
+        if (soil_bar_width > 0) {
+            epaper_draw_rect(&app->driver, 10, y_pos, soil_bar_width, 10, EPAPER_COLOR_BLACK, true);
+        }
+        epaper_draw_rect(&app->driver, 10, y_pos, 102, 10, EPAPER_COLOR_BLACK, false);
+        y_pos += 14;
     }
     
-    // Battery Voltage - very compact format with bar
+    // Separator line before battery
+    ESP_LOGI(TAG, "Drawing separator at y=%d", y_pos);
+    epaper_draw_line(&app->driver, 5, y_pos, app->driver.config.width - 5, y_pos, EPAPER_COLOR_BLACK);
+    y_pos += 10;
+    
+    // Battery Voltage - larger text with bar
     if (app->config.show_battery) {
         snprintf(buffer, sizeof(buffer), "B:%.2fV", battery_voltage);
         ESP_LOGI(TAG, "Drawing: %s at y=%d", buffer, y_pos);
-        epaper_draw_text(&app->driver, 10, y_pos, buffer, 1, EPAPER_ALIGN_LEFT);
+        epaper_draw_text(&app->driver, 10, y_pos, buffer, 2, EPAPER_ALIGN_LEFT);
         y_pos += line_height;
         
-        // Draw battery indicator bar (full width for 122px display)
+        // Draw battery indicator bar
         ESP_LOGI(TAG, "Drawing battery indicator at y=%d", y_pos);
         uint16_t battery_bar_width = (uint16_t)((battery_voltage - 3.0) / (4.2 - 3.0) * 102);
         if (battery_bar_width > 102) battery_bar_width = 102;
         if (battery_bar_width > 0) {
-            epaper_draw_rect(&app->driver, 10, y_pos, battery_bar_width, 8, EPAPER_COLOR_BLACK, true);
+            epaper_draw_rect(&app->driver, 10, y_pos, battery_bar_width, 10, EPAPER_COLOR_BLACK, true);
         }
-        epaper_draw_rect(&app->driver, 10, y_pos, 102, 8, EPAPER_COLOR_BLACK, false);
+        epaper_draw_rect(&app->driver, 10, y_pos, 102, 10, EPAPER_COLOR_BLACK, false);
+        y_pos += 14;
     }
+    
+#if ENABLE_WIFI
+    // Separator line before timestamp
+    ESP_LOGI(TAG, "Drawing separator at y=%d", y_pos);
+    epaper_draw_line(&app->driver, 5, y_pos, app->driver.config.width - 5, y_pos, EPAPER_COLOR_BLACK);
+    y_pos += 10;
+    
+    // Timestamp - display current time and date (requires WiFi/NTP)
+    if (app->config.show_timestamp) {
+        time_t now;
+        struct tm timeinfo;
+        time(&now);
+        localtime_r(&now, &timeinfo);
+        
+        // Check if time is valid (year > 2020 means NTP synced)
+        if (timeinfo.tm_year + 1900 > 2020) {
+            snprintf(buffer, sizeof(buffer), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+            ESP_LOGI(TAG, "Drawing time: %s at y=%d", buffer, y_pos);
+            epaper_draw_text(&app->driver, 10, y_pos, buffer, 2, EPAPER_ALIGN_LEFT);
+            y_pos += line_height;
+            
+            snprintf(buffer, sizeof(buffer), "%02d.%02d.%04d", 
+                     timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900);
+            ESP_LOGI(TAG, "Drawing date: %s at y=%d", buffer, y_pos);
+            epaper_draw_text(&app->driver, 10, y_pos, buffer, 1, EPAPER_ALIGN_LEFT);
+        } else {
+            ESP_LOGI(TAG, "Time not synced yet");
+        }
+    }
+#endif
     
     // Update display (will auto-select full/partial based on counter)
     ESP_LOGI(TAG, "Sending framebuffer to display...");

@@ -30,7 +30,7 @@
 // ============================================================================
 
 #define DEEP_SLEEP_ENABLED              1                   // Enable/disable deep sleep mode (0 = continuous loop with delay)
-#define DEEP_SLEEP_DURATION_SECONDS     60                  // Sleep duration between measurement cycles (60s for e-paper refresh interval)
+#define DEEP_SLEEP_DURATION_SECONDS     360                  // Sleep duration between measurement cycles (60s for e-paper refresh interval)
 #define DEEP_SLEEP_WAKEUP_DELAY_MS      100                 // Delay before entering deep sleep
 
 // ============================================================================
