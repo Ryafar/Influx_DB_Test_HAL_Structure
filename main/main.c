@@ -25,6 +25,10 @@
 #include "influxdb_client.h"
 #include "esp_utils.h"
 
+#if ENABLE_MQTT
+#include "application/mqtt_sender.h"
+#endif
+
 #if ENABLE_BATTERY_MONITOR
 #include "application/battery_monitor_task.h"
 #endif
@@ -138,6 +142,12 @@ static esp_err_t init_system(void) {
     if (USE_INFLUXDB) {
         ESP_ERROR_CHECK(influx_sender_init());
         ESP_LOGI(TAG, "InfluxDB sender initialized");
+    }
+    
+    // Initialize MQTT sender
+    if (USE_MQTT) {
+        ESP_ERROR_CHECK(mqtt_sender_init());
+        ESP_LOGI(TAG, "MQTT sender initialized");
     }
 #else
     ESP_LOGI(TAG, "WiFi disabled - running in offline mode");

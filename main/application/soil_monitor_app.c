@@ -16,6 +16,10 @@
 #include "freertos/task.h"
 #include <string.h>
 
+#if ENABLE_MQTT
+#include "mqtt_sender.h"
+#endif
+
 static const char* TAG = "SOIL_MONITOR_APP";
 
 // Task handle for the monitoring task
@@ -108,6 +112,29 @@ static void soil_monitoring_task(void* pvParameters) {
                     }
                 } else {
                     ESP_LOGW(TAG, "Failed to send soil data to InfluxDB (status: %d)", influx_status);
+                }
+            }
+#endif
+            
+#if USE_MQTT
+            // Send data to MQTT if enabled and WiFi is connected
+            if (app->config.enable_http_sending && wifi_manager_is_connected()) {
+                mqtt_soil_data_t mqtt_data = {
+                    .timestamp_ms = esp_utils_get_timestamp_ms(),
+                    .voltage = reading.voltage,
+                    .moisture_percent = reading.moisture_percent,
+                    .raw_adc = reading.raw_adc,
+                };
+                strncpy(mqtt_data.device_id, app->config.device_id, sizeof(mqtt_data.device_id) - 1);
+                mqtt_data.device_id[sizeof(mqtt_data.device_id) - 1] = '\0';
+                
+                esp_err_t mqtt_ret = mqtt_sender_enqueue_soil(&mqtt_data);
+                if (mqtt_ret == ESP_OK) {
+                    if (app->config.enable_logging) {
+                        ESP_LOGI(TAG, "Soil data queued for MQTT");
+                    }
+                } else {
+                    ESP_LOGW(TAG, "Failed to queue soil data for MQTT: %s", esp_err_to_name(mqtt_ret));
                 }
             }
 #endif

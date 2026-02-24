@@ -47,27 +47,6 @@ typedef enum {
 } mqtt_client_status_t;
 
 /**
- * @brief Soil moisture measurement data for MQTT
- */
-typedef struct {
-    uint64_t timestamp_ms;          ///< Timestamp in milliseconds
-    float voltage;                  ///< Sensor voltage
-    float moisture_percent;         ///< Moisture percentage
-    int raw_adc;                   ///< Raw ADC reading
-    char device_id[32];            ///< Device identifier
-} mqtt_soil_data_t;
-
-/**
- * @brief Battery measurement data for MQTT
- */
-typedef struct {
-    uint64_t timestamp_ms;          ///< Timestamp in milliseconds
-    float voltage;                  ///< Battery voltage
-    float percentage;               ///< Battery percentage (if available)
-    char device_id[32];            ///< Device identifier
-} mqtt_battery_data_t;
-
-/**
  * @brief Initialize MQTT client
  * 
  * @param config MQTT client configuration

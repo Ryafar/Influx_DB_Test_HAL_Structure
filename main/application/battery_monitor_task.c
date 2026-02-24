@@ -15,6 +15,10 @@
 #include "influx_sender.h"
 #include "../drivers/wifi/wifi_manager.h"
 #include "esp_log.h"
+
+#if ENABLE_MQTT
+#include "mqtt_sender.h"
+#endif
 #include "esp_mac.h"
 #include "esp_sleep.h"
 #include "freertos/FreeRTOS.h"
@@ -261,6 +265,28 @@ void battery_monitor_task(void *pvParameters) {
             }
         } else {
             ESP_LOGW(TAG, "WiFi not connected, skipping InfluxDB transmission");
+        }
+#endif
+
+#if USE_MQTT
+        // Send data to MQTT if WiFi is connected
+        if (wifi_manager_is_connected()) {
+            mqtt_battery_data_t mqtt_data = {
+                .timestamp_ms = esp_utils_get_timestamp_ms(),
+                .voltage = battery_voltage,
+                .percentage = -1.0f,  // No percentage calculation for now
+            };
+            strncpy(mqtt_data.device_id, device_id, sizeof(mqtt_data.device_id) - 1);
+            mqtt_data.device_id[sizeof(mqtt_data.device_id) - 1] = '\0';
+            
+            esp_err_t mqtt_ret = mqtt_sender_enqueue_battery(&mqtt_data);
+            if (mqtt_ret == ESP_OK) {
+                ESP_LOGI(TAG, "Battery data queued for MQTT");
+            } else {
+                ESP_LOGW(TAG, "Failed to queue battery data for MQTT: %s", esp_err_to_name(mqtt_ret));
+            }
+        } else {
+            ESP_LOGW(TAG, "WiFi not connected, skipping MQTT transmission");
         }
 #endif
 

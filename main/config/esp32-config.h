@@ -19,7 +19,8 @@
 // Feature Toggles - Enable/Disable Monitoring Modules
 // ============================================================================
 
-#define ENABLE_WIFI             1   // WiFi connectivity (needed for InfluxDB)
+#define ENABLE_WIFI             1   // WiFi connectivity (needed for InfluxDB/MQTT)
+#define ENABLE_MQTT             1   // MQTT client for IoT data publishing (requires WiFi)
 #define ENABLE_ENV_MONITOR      1   // AHT20 temperature/humidity sensor
 #define ENABLE_BATTERY_MONITOR  1   // Battery voltage monitoring via ADC, Battery connected to GPIO0 with 2:1 voltage divider
 #define ENABLE_SOIL_MONITOR     1   // Soil moisture monitoring via ADC
@@ -182,6 +183,19 @@
 #define HTTP_MAX_RETRIES        3                   // More retries
 #define HTTP_ENABLE_BUFFERING   1
 #define HTTP_MAX_BUFFERED_PACKETS  100
+
+// ============================================================================
+// MQTT Configuration
+// ============================================================================
+// Note: MQTT_BROKER_URI, MQTT_USERNAME, MQTT_PASSWORD are defined in credentials.h
+
+#define USE_MQTT                (ENABLE_WIFI && ENABLE_MQTT)  // Enable MQTT publishing (requires WiFi)
+#define MQTT_CLIENT_ID          "ESP32_Soil_Sensor"          // MQTT client ID
+#define MQTT_BASE_TOPIC         "soil_sensor"                 // Base topic for publishing
+#define MQTT_KEEPALIVE          60                            // Keep-alive interval in seconds
+#define MQTT_TIMEOUT_MS         10000                         // Connection timeout in milliseconds
+#define MQTT_QOS                1                             // Quality of Service (0, 1, or 2)
+#define MQTT_DEVICE_ID          "ESP32_C6_001"                // Device identifier for MQTT messages
 
 #endif // ESP32_CONFIG_H
 

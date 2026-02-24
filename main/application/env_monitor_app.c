@@ -23,6 +23,10 @@
 #include "influx_sender.h"
 #include "aht20.h"
 
+#if ENABLE_MQTT
+#include "mqtt_sender.h"
+#endif
+
 static const char* TAG = "ENV_MONITOR_APP";
 
 static TaskHandle_t s_task = NULL;
@@ -83,6 +87,27 @@ static void env_monitor_task(void* pv)
                 influxdb_response_status_t st = send_env_to_influx(t, h, app->config.device_id);
                 if (st != INFLUXDB_RESPONSE_OK) {
                     ESP_LOGW(TAG, "Failed to enqueue env data (status %d)", st);
+                }
+            }
+#endif
+            
+#if USE_MQTT
+            if (app->config.enable_http_sending && wifi_manager_is_connected()) {
+                mqtt_env_data_t mqtt_data = {
+                    .timestamp_ms = esp_utils_get_timestamp_ms(),
+                    .temperature = t,
+                    .humidity = h,
+                };
+                strncpy(mqtt_data.device_id, app->config.device_id, sizeof(mqtt_data.device_id) - 1);
+                mqtt_data.device_id[sizeof(mqtt_data.device_id) - 1] = '\0';
+                
+                esp_err_t mqtt_ret = mqtt_sender_enqueue_env(&mqtt_data);
+                if (mqtt_ret == ESP_OK) {
+                    if (app->config.enable_logging) {
+                        ESP_LOGI(TAG, "Env data queued for MQTT");
+                    }
+                } else {
+                    ESP_LOGW(TAG, "Failed to queue env data for MQTT: %s", esp_err_to_name(mqtt_ret));
                 }
             }
 #endif
